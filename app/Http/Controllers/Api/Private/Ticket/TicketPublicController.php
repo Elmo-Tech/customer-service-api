@@ -41,7 +41,10 @@ class TicketPublicController extends Controller
             'customer:id,firstname,lastname',
             'company:id,name',
             'attachments:id,ticket_id,path'
-        ])->where('id', $ticketId)->first();
+        ])
+            ->where('id', $ticketId)
+            ->where('token', $token)
+            ->first();
 
         if (!$ticket) {
             return response()->json([

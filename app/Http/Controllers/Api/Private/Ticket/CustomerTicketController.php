@@ -51,11 +51,13 @@ class CustomerTicketController extends Controller
 
 
             $ticketAttachments = $ticketData['attachments']??[];
+            $attachments = [];
 
 
             foreach ($ticketAttachments as $key => $attachmentData) {
 
                 $attachment = $this->uploadService->uploadFile($attachmentData, "tickets/$ticket->id");
+                $attachments[] = $attachment;
 
                 $ticket->attachments()->create([
                     'path' => $attachment
@@ -78,7 +80,8 @@ class CustomerTicketController extends Controller
 
             $content = [
                 'subject' => $subject,
-                'body' => $ticket->description
+                'body' => $ticket->description,
+                'attachments' => $attachments
             ];
             
             $user = Auth::user();

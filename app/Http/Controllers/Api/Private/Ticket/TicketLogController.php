@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Api\Private\Ticket;
 
+use App\Enums\Ticket\TicketStatus;
 use App\Http\Controllers\Controller;
+use App\Mail\TicketDetails;
 use App\Models\Tiket\Ticket;
 use App\Models\Tiket\TicketLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\Ticket\TicketService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Mail;
 
 class TicketLogController extends Controller
 {
@@ -64,7 +67,7 @@ class TicketLogController extends Controller
             'ticketId' => 'required|integer|exists:tickets,id',
             'token'    => 'required|string',
             'text' => 'required|string',
-            'status' => 'required'
+            'status' => 'required|integer|in:1,3'
         ]);
 
         $ticketId = $request->input('ticketId');
@@ -106,10 +109,25 @@ class TicketLogController extends Controller
             
             $ticket->status = $request->status;
             $ticket->token = null;
-            if($ticket->status == 3){
+            if($ticket->status == TicketStatus::REOPENED->value){
                 $ticket->closed_at = null;
             }
             $ticket->save();
+
+            if($ticket->status == TicketStatus::REOPENED->value){
+                $ticket->load(['customer', 'company', 'attachments']);
+
+                $content = [
+                    'subject' => "ticket: " . $ticket->ticket_number . " | Riaperta | " . $ticket->customer->getFullName() . ' | ' . $ticket->company->name,
+                    'body' => "stato: Riaperta | data: " . Carbon::parse($ticket->updated_at)->format('d/m/Y H:m') . "<br><br><br>" . $request->text,
+                    'attachments' => $ticket->attachments->pluck('path')->all()
+                ];
+
+                Mail::to('it-arca@arcagroup.eu')->send(new TicketDetails($content));
+                Mail::to('ms5325749@gmail.com')->send(new TicketDetails($content));
+                Mail::to('mr10dev10@gmail.com')->send(new TicketDetails($content));
+                Mail::to('s.mohamed@elmotech.it')->send(new TicketDetails($content));
+            }
             
 
             DB::commit();

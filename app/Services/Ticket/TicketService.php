@@ -23,7 +23,19 @@ class TicketService{
         $tickets = QueryBuilder::for(Ticket::class)
             ->allowedFilters([
                 AllowedFilter::custom('search', new FilterTicket()),
-                AllowedFilter::exact('status'),
+                AllowedFilter::callback('status', function (Builder $query, $value) {
+                    $status = is_array($value) ? reset($value) : $value;
+
+                    if ((string) $status === (string) TicketStatus::OPENED->value) {
+                        $query->whereIn('status', [
+                            TicketStatus::OPENED->value,
+                            TicketStatus::REOPENED->value,
+                        ]);
+                        return;
+                    }
+
+                    $query->where('status', $status);
+                }),
                 AllowedFilter::exact('importance'),
                 AllowedFilter::exact('company', 'company_id'),
                 AllowedFilter::exact('tag', 'tag_id'),

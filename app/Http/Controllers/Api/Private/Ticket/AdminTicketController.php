@@ -102,7 +102,8 @@ class AdminTicketController extends Controller
 
                 $content = [
                     'subject' => $subject,
-                    'body' => "stato: " . $status[$ticket->status] . " | data: " . ($ticket->status == 1? Carbon::parse($ticket->closed_at)->format('d/m/Y H:m') :  Carbon::parse($ticket->updated_at)->format('d/m/Y H:m')) . "<br><br><br>" . $ticket->description
+                    'body' => "stato: " . $status[$ticket->status] . " | data: " . ($ticket->status == 1? Carbon::parse($ticket->closed_at)->format('d/m/Y H:m') :  Carbon::parse($ticket->updated_at)->format('d/m/Y H:m')) . "<br><br><br>" . $ticket->description,
+                    'attachments' => $ticket->attachments()->pluck('path')->all()
                 ];
 
                 $user= Auth::user();

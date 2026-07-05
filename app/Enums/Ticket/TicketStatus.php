@@ -7,6 +7,7 @@ enum TicketStatus: int{
     case DONE = 1;
     case IN_PROGRESS = 2;
     case OPENED = 0;
+    case REOPENED = 3;
 
     public static function values(): array
     {

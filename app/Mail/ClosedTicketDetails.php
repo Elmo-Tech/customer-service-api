@@ -8,6 +8,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Queue\SerializesModels;
 
 class ClosedTicketDetails extends Mailable
@@ -49,6 +50,9 @@ class ClosedTicketDetails extends Mailable
      */
     public function attachments(): array
     {
-        return [];
+        return array_map(
+            fn ($path) => Attachment::fromStorageDisk('public', $path),
+            $this->content['attachments'] ?? []
+        );
     }
 }
