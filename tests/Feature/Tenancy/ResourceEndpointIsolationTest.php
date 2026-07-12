@@ -69,6 +69,12 @@ class ResourceEndpointIsolationTest extends TestCase
             "/api/v1/admin/customers?filter[company]={$this->otherCompany->id}"
         )->assertOk();
         $users = $this->actingAs($this->owner, 'api')->getJson('/api/v1/admin/users')->assertOk();
+        $alteredCompany = $this->actingAs($this->owner, 'api')->getJson(
+            "/api/v1/admin/users?filter[company]={$this->otherCompany->id}",
+        )->assertOk();
+        $alteredBranch = $this->actingAs($this->owner, 'api')->getJson(
+            "/api/v1/admin/users?filter[branch]={$this->otherCompanyBranch->id}",
+        )->assertOk();
 
         $this->assertSame([$this->tenantCompany->id], collect($companies->json('result.companies'))->pluck('companyId')->all());
         $this->assertSame([], $customers->json('result.customers'));
@@ -76,6 +82,8 @@ class ResourceEndpointIsolationTest extends TestCase
             $this->otherTenantUser->id,
             collect($users->json('result.users'))->pluck('userId')->all(),
         );
+        $this->assertSame([], $alteredCompany->json('result.users'));
+        $this->assertSame([], $alteredBranch->json('result.users'));
         $ownerRow = collect($users->json('result.users'))->firstWhere('userId', $this->owner->id);
         $this->assertSame(TenantRole::COMPANY_OWNER->value, $ownerRow['roleName']);
         $this->assertSame($this->tenantCompany->name, $ownerRow['companyName']);

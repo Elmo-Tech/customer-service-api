@@ -89,6 +89,7 @@ Route::prefix('v1/admin/tickets')->group(function () {
 });
 
 Route::prefix('v1/admin/roles')->group(function () {
+    Route::get('matrix', [RoleController::class, 'matrix']);
     Route::get('', [RoleController::class, 'allRoles']);
     Route::post('create', [RoleController::class, 'create']);
     Route::get('edit', [RoleController::class, 'edit']);

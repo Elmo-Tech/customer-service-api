@@ -32,6 +32,8 @@ class Ticket extends Model
         'tag_id',
         'opened_by_user_id',
         'assigned_to_user_id',
+        'due_at',
+        'escalated_at',
     ];
 
     protected $cast = [

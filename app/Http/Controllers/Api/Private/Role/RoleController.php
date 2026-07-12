@@ -23,6 +23,7 @@ class RoleController extends Controller
         $this->middleware('permission:edit_role')->only('edit');
         $this->middleware('permission:update_role')->only('update');
         $this->middleware('permission:delete_role')->only('delete');
+        $this->middleware('permission:all_roles')->only('matrix');
     }
 
     public function allRoles(Request $request): JsonResponse
@@ -61,5 +62,10 @@ class RoleController extends Controller
         DB::transaction(fn () => $this->roleService->deleteRole($request->integer('roleId')));
 
         return response()->json(['message' => 'تم حذف البلد بنجاح!']);
+    }
+
+    public function matrix(): JsonResponse
+    {
+        return response()->json(['data' => $this->roleService->matrix()]);
     }
 }

@@ -39,7 +39,33 @@ class RolesSeederTest extends TestCase
 
         Role::findByName(TenantRole::EMPLOYEE->value, 'api')->givePermissionTo('all_users');
         $this->seed(RolesAndPermissionsSeeder::class);
-        $this->assertTrue(Role::findByName(TenantRole::EMPLOYEE->value, 'api')->hasPermissionTo('all_users'));
+        $this->assertFalse(Role::findByName(TenantRole::EMPLOYEE->value, 'api')->hasPermissionTo('all_users'));
+    }
+
+    public function test_system_role_matrix_is_visible_but_templates_cannot_be_changed(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $admin = User::create([
+            'name' => 'Matrix Admin', 'username' => 'matrix-admin', 'email' => 'matrix@example.com',
+            'password' => 'Password1!', 'status' => 1, 'account_type' => AccountType::INTERNAL,
+        ]);
+        $admin->assignRole('مدير');
+        $employee = Role::findByName(TenantRole::EMPLOYEE->value, 'api');
+
+        $this->actingAs($admin, 'api')->getJson('/api/v1/admin/roles/matrix')
+            ->assertOk()->assertJsonFragment([
+                'name' => TenantRole::EMPLOYEE->value,
+                'accountType' => AccountType::TENANT->value,
+                'permissions' => ['all_tickets', 'create_ticket'],
+            ]);
+        $this->actingAs($admin, 'api')->putJson('/api/v1/admin/roles/update', [
+            'roleId' => $employee->id,
+            'name' => $employee->name,
+            'permissions' => ['all_users'],
+        ])->assertUnprocessable();
+        $this->actingAs($admin, 'api')->deleteJson("/api/v1/admin/roles/delete?roleId={$employee->id}")
+            ->assertUnprocessable();
+        $this->assertFalse($employee->fresh()->hasPermissionTo('all_users'));
     }
 
     public function test_initial_admin_uses_explicit_configuration_and_is_idempotent(): void

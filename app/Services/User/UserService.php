@@ -40,6 +40,8 @@ class UserService
             AllowedFilter::custom('search', new FilterUser),
             AllowedFilter::exact('status'),
             AllowedFilter::custom('role', new FilterUserRole),
+            AllowedFilter::exact('company', 'company_id'),
+            AllowedFilter::exact('branch', 'branch_id'),
         ])->get();
     }
 

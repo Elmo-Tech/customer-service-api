@@ -24,6 +24,7 @@ class TicketDashboardService
             'series' => $this->series($tickets, $statusCounts),
             'oldestOpen' => $this->ticketRows($this->oldestOpen($tickets)),
             'recentActivity' => $this->ticketRows($this->recentActivity($tickets)),
+            'slaAlerts' => $this->ticketRows($this->slaAlerts($tickets)),
         ];
     }
 
@@ -49,6 +50,9 @@ class TicketDashboardService
             'closed' => $statusCounts[TicketStatus::DONE->value] ?? 0,
             'reopened' => $statusCounts[TicketStatus::REOPENED->value] ?? 0,
             'averageResolutionHours' => $this->averageResolutionHours($tickets),
+            'overdue' => $this->overdue($tickets)->count(),
+            'dueSoon' => $this->dueSoon($tickets)->count(),
+            'escalated' => (clone $tickets)->whereNotNull('escalated_at')->count(),
         ];
     }
 
@@ -123,6 +127,32 @@ class TicketDashboardService
             ->orderByDesc('updated_at')->limit(10)->get();
     }
 
+    private function slaAlerts(Builder $tickets)
+    {
+        return $this->active($tickets)->whereNotNull('due_at')
+            ->with(['customer:id,firstname,lastname', 'openedBy:id,name', 'company:id,name', 'branch:id,name'])
+            ->orderBy('due_at')->limit(10)->get();
+    }
+
+    private function overdue(Builder $tickets): Builder
+    {
+        return $this->active($tickets)->whereNotNull('due_at')->where('due_at', '<', now());
+    }
+
+    private function dueSoon(Builder $tickets): Builder
+    {
+        return $this->active($tickets)->whereBetween('due_at', [now(), now()->addDay()]);
+    }
+
+    private function active(Builder $tickets): Builder
+    {
+        return (clone $tickets)->whereIn('status', [
+            TicketStatus::OPENED->value,
+            TicketStatus::IN_PROGRESS->value,
+            TicketStatus::REOPENED->value,
+        ]);
+    }
+
     private function ticketRows($tickets): array
     {
         return $tickets->map(fn (Ticket $ticket) => [
@@ -135,6 +165,10 @@ class TicketDashboardService
             'importance' => $ticket->getRawOriginal('importance'),
             'createdAt' => Carbon::parse($ticket->created_at)->toISOString(),
             'closedAt' => $ticket->closed_at ? Carbon::parse($ticket->closed_at)->toISOString() : null,
+            'dueAt' => $ticket->due_at ? Carbon::parse($ticket->due_at)->toISOString() : null,
+            'escalatedAt' => $ticket->escalated_at ? Carbon::parse($ticket->escalated_at)->toISOString() : null,
+            'isOverdue' => $ticket->due_at !== null && Carbon::parse($ticket->due_at)->isPast()
+                && (int) $ticket->status !== TicketStatus::DONE->value,
         ])->all();
     }
 }

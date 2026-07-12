@@ -3,9 +3,9 @@
 namespace App\Http\Resources\Ticket;
 
 use App\Http\Resources\Ticket\Attachment\AttachmentResource;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-
 
 class TicketResource extends JsonResource
 {
@@ -26,8 +26,10 @@ class TicketResource extends JsonResource
             'importance' => $this->importance,
             'description' => $this->description,
             'attachments' => AttachmentResource::collection($this->whenLoaded('attachments')),
-            'tagId' => $this->tag_id??"",
-            'closedAt' => $this->closed_at??""
+            'tagId' => $this->tag_id ?? '',
+            'closedAt' => $this->closed_at ?? '',
+            'dueAt' => $this->due_at ? Carbon::parse($this->due_at)->toIso8601String() : null,
+            'escalatedAt' => $this->escalated_at ? Carbon::parse($this->escalated_at)->toIso8601String() : null,
         ];
     }
 }

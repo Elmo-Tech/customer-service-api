@@ -14,6 +14,7 @@ class TicketService
     public function __construct(
         private readonly TicketReferenceValidator $referenceValidator,
         private readonly AuthorizedTicketQuery $ticketQuery,
+        private readonly TicketSlaService $sla,
     ) {}
 
     public function allTickets(User $user, array $filters)
@@ -32,10 +33,12 @@ class TicketService
             $ticketData['branchId'] ?? null,
         );
 
+        $importance = TicketImportanceStatus::from($ticketData['importance']);
+
         return Ticket::create([
             'company_id' => $ticketData['companyId'],
             'status' => TicketStatus::from($ticketData['status'])->value,
-            'importance' => TicketImportanceStatus::from($ticketData['importance'])->value,
+            'importance' => $importance->value,
             'description' => $ticketData['description'],
             'customer_id' => $ticketData['customerId'] ?? null,
             'branch_id' => $ticketData['branchId'] ?? null,
@@ -43,6 +46,7 @@ class TicketService
             'tag_id' => $ticketData['tagId'] ?? null,
             'opened_by_user_id' => $ticketData['openedByUserId'] ?? null,
             'real_closed_at' => TicketStatus::from($ticketData['status']) === TicketStatus::DONE ? now() : null,
+            'due_at' => $this->sla->dueAt($importance->value, now()),
         ]);
     }
 
@@ -87,7 +91,7 @@ class TicketService
             $ticketData['customerId'] ?? null,
             $ticketData['branchId'] ?? null,
         );
-        $ticket->update($this->updatedAttributes($ticketData));
+        $ticket->update($this->updatedAttributes($ticket, $ticketData));
 
         return $ticket;
     }
@@ -104,20 +108,42 @@ class TicketService
         }
     }
 
-    private function updatedAttributes(array $ticketData): array
+    private function updatedAttributes(Ticket $ticket, array $ticketData): array
     {
         $status = TicketStatus::from($ticketData['status']);
         $closedAt = $ticketData['closedAt'] ?? ($status === TicketStatus::DONE ? now() : null);
 
+        $importance = TicketImportanceStatus::from($ticketData['importance']);
+
         return [
             'status' => $status->value,
-            'importance' => TicketImportanceStatus::from($ticketData['importance'])->value,
+            'importance' => $importance->value,
             'description' => $ticketData['description'],
             'customer_id' => $ticketData['customerId'] ?? null,
             'branch_id' => $ticketData['branchId'] ?? null,
             'closed_at' => $closedAt,
             'tag_id' => $ticketData['tagId'] ?? null,
             'real_closed_at' => $status === TicketStatus::DONE ? now() : null,
+            ...$this->updatedSla($ticket, $status, $importance),
+        ];
+    }
+
+    private function updatedSla(
+        Ticket $ticket,
+        TicketStatus $status,
+        TicketImportanceStatus $importance,
+    ): array {
+        $importanceChanged = (int) $ticket->importance !== $importance->value;
+        $reopened = (int) $ticket->status === TicketStatus::DONE->value && $status === TicketStatus::REOPENED;
+        if (! $importanceChanged && ! $reopened) {
+            return ['due_at' => $ticket->due_at, 'escalated_at' => $ticket->escalated_at];
+        }
+
+        $startedAt = $reopened || $ticket->due_at === null ? now() : $ticket->created_at;
+
+        return [
+            'due_at' => $this->sla->dueAt($importance->value, $startedAt),
+            'escalated_at' => null,
         ];
     }
 }

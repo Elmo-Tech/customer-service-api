@@ -8,6 +8,7 @@ Production is not approved until every required item below has evidence attached
 - [ ] Apply the validated mapping with `tenancy:apply-mapping --execute`, then confirm no active user remains unclassified.
 - [ ] Capture a verified backup and perform a restore rehearsal.
 - [ ] Rehearse all additive migrations and rollbacks against a MySQL-connected production-like copy.
+- [ ] Rehearse `2026_07_12_003000_add_sla_fields_to_tickets` and its rollback on that copy.
 - [ ] Inventory row counts and relationships before and after rehearsal: companies, branches, customers, tickets, attachments, logs, users, roles, permissions, refresh sessions, review capabilities, invitations, and audit events.
 - [ ] Confirm no database, schema-per-tenant, destructive migration, legacy file deletion, or data rewrite is introduced.
 
@@ -18,6 +19,8 @@ Production is not approved until every required item below has evidence attached
 - [ ] Verify internal, company owner/manager, branch manager, employee, and branchless accounts against the access matrix.
 - [ ] Compare list, export, and dashboard totals for the same authorized filters.
 - [ ] Verify direct-ID, altered filter, soft-delete, cross-company customer/branch/user, attachment-parent, and export attacks fail closed.
+- [ ] Review system-role assignments before reseeding; verify templates are read-only and exact permissions are restored.
+- [ ] Verify internal Team company/branch filters and altered tenant filters using two companies.
 
 ## Sessions, cookies, invitations, and email
 
@@ -27,6 +30,7 @@ Production is not approved until every required item below has evidence attached
 - [ ] Run a real queue worker and SMTP test proving invitation mail is dispatched after commit.
 - [ ] Simulate mail failure, then resend and consume only the replacement invitation.
 - [ ] Verify invitation expiry, revocation, replay, active-state revalidation, and concurrent consumption on MySQL.
+- [ ] Verify one overdue ticket queues one tenant-scoped escalation email and does not resend on the next run.
 
 ## Frontend and operations
 
@@ -37,6 +41,8 @@ Production is not approved until every required item below has evidence attached
 - [ ] Freeze or snapshot the legacy source, copy attachment files, rehearse target restore, then run `tickets:import-legacy ... --execute --confirm` once and reconcile counts.
 - [ ] Confirm `npm audit --omit=dev` remains clean and the production bundle matches the reviewed artifact.
 - [ ] Keep the Vite development server private until the separately approved breaking upgrade resolves its development-only advisories.
+- [ ] Confirm the application timezone, queue retry/failed-job monitoring, and scheduler process.
+- [ ] Keep the scheduler paused until queue/SMTP tests pass, then confirm `tickets:escalate-overdue` runs without overlap.
 
 ## Observation and later cleanup
 

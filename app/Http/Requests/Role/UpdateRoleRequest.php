@@ -3,10 +3,7 @@
 namespace App\Http\Requests\Role;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
-use Illuminate\Validation\Rules\Enum;
-
+use Illuminate\Validation\Rule;
 
 class UpdateRoleRequest extends FormRequest
 {
@@ -26,17 +23,13 @@ class UpdateRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'roleId' => 'required',
-            'name' => 'required',
-            'permissions' => ['required'],
+            'roleId' => ['required', 'integer', 'exists:roles,id'],
+            'name' => [
+                'required', 'string', 'max:125',
+                Rule::unique('roles', 'name')->ignore($this->integer('roleId')),
+            ],
+            'permissions' => ['required', 'array', 'min:1'],
+            'permissions.*' => ['string', 'distinct', 'exists:permissions,name'],
         ];
     }
-
-    public function failedValidation(Validator $validator)
-    {
-        throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
-        ], 401));
-    }
-
 }

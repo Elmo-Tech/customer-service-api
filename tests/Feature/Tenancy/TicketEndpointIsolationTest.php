@@ -15,6 +15,7 @@ use App\Models\Tiket\Ticket;
 use App\Models\Tiket\TicketAttachment;
 use App\Models\Tiket\TicketLog;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -142,6 +143,7 @@ class TicketEndpointIsolationTest extends TestCase
 
     public function test_employee_authenticated_submission_derives_tenant_and_opener(): void
     {
+        Carbon::setTestNow('2026-07-12 10:00:00');
         $employee = $this->tenantUser('submitting-employee', TenantRole::EMPLOYEE, $this->tenantBranch);
         $employee->givePermissionTo('all_tickets');
 
@@ -158,7 +160,9 @@ class TicketEndpointIsolationTest extends TestCase
             'customer_id' => null,
             'opened_by_user_id' => $employee->id,
             'status' => TicketStatus::OPENED->value,
+            'due_at' => '2026-07-15 10:00:00',
         ]);
+        Carbon::setTestNow();
     }
 
     public function test_authenticated_submission_ignores_client_customer_identity(): void

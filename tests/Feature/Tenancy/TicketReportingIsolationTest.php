@@ -13,9 +13,11 @@ use App\Models\Company\Company;
 use App\Models\Company\Customer;
 use App\Models\Tiket\Ticket;
 use App\Models\User;
+use App\Notifications\TicketSlaEscalated;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -172,6 +174,38 @@ class TicketReportingIsolationTest extends TestCase
 
         $this->dashboard($owner)->assertJsonPath('data.kpis.total', 1)
             ->assertJsonPath('data.series.branchVolume', []);
+    }
+
+    public function test_sla_metrics_and_escalation_are_scoped_and_idempotent(): void
+    {
+        Notification::fake();
+        Carbon::setTestNow('2026-07-12 12:00:00');
+        $owner = $this->tenantUser('sla-owner', TenantRole::COMPANY_OWNER, $this->company, $this->branch);
+        $otherOwner = $this->tenantUser('sla-other-owner', TenantRole::COMPANY_OWNER, $this->otherCompany, $this->otherBranch);
+        $owner->givePermissionTo('view_ticket_dashboard');
+        $overdue = $this->ticket($this->company, $this->branch, $this->customer, ['due_at' => now()->subHour()]);
+        $this->ticket($this->company, $this->branch, $this->customer, ['due_at' => now()->addHours(12)]);
+        $otherOverdue = $this->ticket(
+            $this->otherCompany,
+            $this->otherBranch,
+            $this->otherCustomer,
+            ['due_at' => now()->subHour()],
+        );
+
+        $this->dashboard($owner)->assertJsonPath('data.kpis.overdue', 1)
+            ->assertJsonPath('data.kpis.dueSoon', 1)
+            ->assertJsonCount(2, 'data.slaAlerts');
+        $this->artisan('tickets:escalate-overdue')->assertSuccessful();
+        $this->artisan('tickets:escalate-overdue')->assertSuccessful();
+
+        $this->assertNotNull($overdue->fresh()->escalated_at);
+        Notification::assertSentTo($owner, TicketSlaEscalated::class, fn ($notification) => str_contains($notification->toMail()->subject, $overdue->ticket_number)
+        );
+        Notification::assertSentTo($otherOwner, TicketSlaEscalated::class, fn ($notification) => str_contains($notification->toMail()->subject, $otherOverdue->ticket_number)
+        );
+        Notification::assertSentToTimes($owner, TicketSlaEscalated::class, 1);
+        Notification::assertSentToTimes($otherOwner, TicketSlaEscalated::class, 1);
+        Carbon::setTestNow();
     }
 
     public function test_reporting_requires_authentication_and_compatible_permissions(): void

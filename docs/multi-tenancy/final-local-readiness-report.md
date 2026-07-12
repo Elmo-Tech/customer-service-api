@@ -6,7 +6,7 @@ The multi-tenant implementation is complete against local SQLite fixtures. It is
 
 ## Verified locally
 
-- Backend: 89 tests and 407 assertions pass.
+- Backend: 103 tests and 505 assertions pass.
 - Frontend: 9 focused Node tests pass; ESLint and the Vite production build pass.
 - Phase PHP files pass Pint. Repository-wide Pint reports 74 historical style violations in unrelated legacy files and migrations; no bulk reformat was performed.
 - Fresh SQLite migration through `2026_07_12_001000_create_tenant_audit_events` passes. Seven-step rollback removes the two onboarding tables and the five earlier additive tenancy migrations without touching legacy migrations.
@@ -36,6 +36,7 @@ Intentionally deferred contractions:
 - canonical reporting permissions must be assigned before deployment; `all_tickets` does not grant dashboard or export access;
 - old invitation/audit retention cleanup has no destructive migration and requires a retention decision;
 - repository-wide legacy formatting cleanup and the breaking Vite upgrade are separate maintenance work.
+- historical ticket SLA deadlines remain null until an authoritative backfill policy is approved.
 
 ## Unresolved local limitations
 
