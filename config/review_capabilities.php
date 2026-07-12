@@ -3,5 +3,5 @@
 return [
     'purpose' => 'ticket_review',
     'ttl_minutes' => (int) env('TICKET_REVIEW_TTL', 10080),
-    'frontend_url' => env('FRONTEND_URL', 'http://tickets.testingelmo.com'),
+    'frontend_url' => env('FRONTEND_URL', 'http://tickets-sys.testingelmo.com'),
 ];
