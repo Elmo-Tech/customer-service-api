@@ -7,6 +7,7 @@ use App\Enums\Ticket\TicketStatus;
 use App\Models\Company\Branch;
 use App\Models\Company\Company;
 use App\Models\Company\Customer;
+use App\Models\User;
 use App\Traits\CreatedUpdatedBy;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Ticket extends Model
 {
-    use HasFactory, SoftDeletes, CreatedUpdatedBy;
+    use CreatedUpdatedBy, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'status',
@@ -28,12 +29,14 @@ class Ticket extends Model
         'branch_id',
         'closed_at',
         'real_closed_at',
-        'tag_id'
+        'tag_id',
+        'opened_by_user_id',
+        'assigned_to_user_id',
     ];
 
     protected $cast = [
         'status' => TicketStatus::class,
-        'importance' => TicketImportanceStatus::class
+        'importance' => TicketImportanceStatus::class,
     ];
 
     public static function boot()
@@ -41,9 +44,7 @@ class Ticket extends Model
         parent::boot();
 
         static::creating(function ($model) {
-
-            $model->ticket_number = 'T' . generateUniqNumber(4) . $model->customer_id . "_" . Carbon::now()->format("m/Y");
-
+            $model->ticket_number = 'T'.generateUniqNumber(4).$model->customer_id.'_'.Carbon::now()->format('m/Y');
         });
     }
 
@@ -62,16 +63,23 @@ class Ticket extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function openedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'opened_by_user_id');
+    }
+
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
     public function attachments(): HasMany
     {
         return $this->hasMany(TicketAttachment::class);
     }
-    
+
     public function logs()
     {
         return $this->hasMany(TicketLog::class);
     }
-
-
-
 }

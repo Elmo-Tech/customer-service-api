@@ -3,12 +3,11 @@
 namespace App\Http\Requests\User;
 
 use App\Enums\User\UserStatus;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Rules\Password;
-
 
 class CreateUserRequest extends FormRequest
 {
@@ -29,27 +28,27 @@ class CreateUserRequest extends FormRequest
     {
         return [
             'name' => 'required',
-            'username'=> ['required', 'unique:users,username'],
-            'email'=> ['required', 'unique:users,email'],
+            'username' => ['required', 'unique:users,username'],
+            'email' => ['required', 'unique:users,email'],
             'phone' => '',
             'address' => '',
             'status' => ['required', new Enum(UserStatus::class)],
-            'password'=> [
-                'required','string',
+            'password' => [
+                'required', 'string',
                 Password::min(8)->mixedCase()->numbers()->symbols()->uncompromised(),
                 /*'min:8',
                 'regex:/^.*(?=.{1,})(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[\d\x]).*$/'*/
             ],
-            'roleId'=> ['required', 'numeric', 'exists:roles,id'],
-            'avatar' => ["sometimes", "nullable","image", "mimes:jpeg,jpg,png,gif", "max:2048"],
+            'roleId' => ['required', 'numeric', 'exists:roles,id'],
+            'branchId' => ['nullable', 'integer'],
+            'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,jpg,png,gif', 'max:2048'],
         ];
     }
 
     public function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
+            'message' => $validator->errors(),
         ], 401));
     }
-
 }

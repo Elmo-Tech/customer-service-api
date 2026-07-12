@@ -5,7 +5,6 @@ namespace App\Http\Resources\Company;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-
 class CompanyResource extends JsonResource
 {
     /**
@@ -19,6 +18,7 @@ class CompanyResource extends JsonResource
             'companyId' => $this->id,
             'name' => $this->name,
             'status' => $this->status,
+            'usesBranches' => $this->uses_branches,
         ];
     }
 }

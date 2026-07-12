@@ -3,12 +3,11 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Attachment;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class TicketDetails extends Mailable
@@ -19,7 +18,9 @@ class TicketDetails extends Mailable
      * Create a new message instance.
      */
     public array $content;
-    public function __construct(array $content) {
+
+    public function __construct(array $content)
+    {
         $this->content = $content;
     }
 
@@ -29,10 +30,11 @@ class TicketDetails extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: new Address('it-arca@arcagroup.eu', 'Assistenza Elmo Tech'), 
+            from: new Address('it-arca@arcagroup.eu', 'Assistenza Elmo Tech'),
             subject: $this->content['subject'],
         );
     }
+
     /**
      * Get the message content definition.
      */
@@ -51,7 +53,10 @@ class TicketDetails extends Mailable
     public function attachments(): array
     {
         return array_map(
-            fn ($path) => Attachment::fromStorageDisk('public', $path),
+            fn ($attachment) => Attachment::fromStorageDisk(
+                is_array($attachment) ? $attachment['disk'] : 'public',
+                is_array($attachment) ? $attachment['path'] : $attachment,
+            ),
             $this->content['attachments'] ?? []
         );
     }

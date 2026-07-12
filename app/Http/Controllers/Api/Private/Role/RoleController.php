@@ -7,121 +7,59 @@ use App\Http\Requests\Role\CreateRoleRequest;
 use App\Http\Requests\Role\UpdateRoleRequest;
 use App\Http\Resources\Role\AllRoleCollection;
 use App\Http\Resources\Role\RoleResource;
-use App\Utils\PaginateCollection;
 use App\Services\Role\RoleService;
+use App\Utils\PaginateCollection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-
 class RoleController extends Controller
 {
-    protected $roleService;
-
-    public function __construct(RoleService $roleService)
+    public function __construct(private readonly RoleService $roleService)
     {
-        /*$this->middleware('auth:api');
-        $this->middleware('permission:all_countries', ['only' => ['allCountries']]);
-        $this->middleware('permission:create_role', ['only' => ['create']]);
-        $this->middleware('permission:edit_role', ['only' => ['edit']]);
-        $this->middleware('permission:update_role', ['only' => ['update']]);
-        $this->middleware('permission:delete_role', ['only' => ['delete']]);*/
-        $this->roleService = $roleService;
+        $this->middleware(['auth:api', 'internal']);
+        $this->middleware('permission:all_roles')->only('allRoles');
+        $this->middleware('permission:create_role')->only('create');
+        $this->middleware('permission:edit_role')->only('edit');
+        $this->middleware('permission:update_role')->only('update');
+        $this->middleware('permission:delete_role')->only('delete');
     }
 
-    /**
-     * Display a listing of the resource.
-    */
-    public function allRoles(Request $request)
+    public function allRoles(Request $request): JsonResponse
     {
-        $allRoles = $this->roleService->allRoles();
+        $roles = $this->roleService->allRoles();
+        $pageSize = $request->integer('pageSize', 10);
 
         return response()->json(
-            new AllRoleCollection(PaginateCollection::paginate($allRoles, $request->pageSize?$request->pageSize:10))
-        , 200);
-
+            new AllRoleCollection(PaginateCollection::paginate($roles, $pageSize)),
+        );
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-
-    public function create(CreateRoleRequest $createRoleRequest)
+    public function create(CreateRoleRequest $request): JsonResponse
     {
+        DB::transaction(fn () => $this->roleService->createRole($request->validated()));
 
-        try {
-            DB::beginTransaction();
-
-            $this->roleService->createRole($createRoleRequest->validated());
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'new role has been added'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'new role has been added']);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-
-    public function edit(Request $request)
+    public function edit(Request $request): JsonResponse
     {
-        $role  =  $this->roleService->editRole($request->roleId);
-
-        return response()->json(
-            new RoleResource($role)//new UserResource($user)
-        ,200);
-
+        return response()->json(new RoleResource(
+            $this->roleService->editRole($request->integer('roleId')),
+        ));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateRoleRequest $updateRoleRequest)
+    public function update(UpdateRoleRequest $request): JsonResponse
     {
+        DB::transaction(fn () => $this->roleService->updateRole($request->validated()));
 
-        try {
-            DB::beginTransaction();
-            $this->roleService->updateRole($updateRoleRequest->validated());
-            DB::commit();
-            return response()->json([
-                 'message' => 'تم تحديث بيانات البلد!'
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'تم تحديث بيانات البلد!']);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function delete(Request $request)
+    public function delete(Request $request): JsonResponse
     {
+        DB::transaction(fn () => $this->roleService->deleteRole($request->integer('roleId')));
 
-        try {
-            DB::beginTransaction();
-            $this->roleService->deleteRole($request->roleId);
-            DB::commit();
-            return response()->json([
-                'message' => 'تم حذف البلد بنجاح!'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'تم حذف البلد بنجاح!']);
     }
-
 }

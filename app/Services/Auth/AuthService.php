@@ -2,139 +2,123 @@
 
 namespace App\Services\Auth;
 
+use App\Enums\User\AccountType;
 use App\Http\Resources\Role\RoleResource;
 use App\Http\Resources\User\UserResource;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use App\Services\UserRolePremission\UserPermissionService;
-use Spatie\Permission\Models\Role;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Tymon\JWTAuth\Exceptions\JWTException;
 
 class AuthService
 {
-
-    protected $userPermissionService;
-
     public function __construct(
-        UserPermissionService $userPermissionService,
-    )
+        private readonly UserPermissionService $userPermissionService,
+        private readonly AccountAccess $accountAccess,
+        private readonly RefreshSessionService $refreshSessions,
+        private readonly RefreshCookie $refreshCookie,
+    ) {}
+
+    public function login(array $credentials, Request $request): JsonResponse
     {
-        $this->userPermissionService = $userPermissionService;
-    }
+        $userToken = Auth::attempt([
+            'username' => $credentials['username'],
+            'password' => $credentials['password'],
+        ]);
 
-    public function register(array $data){
-        try {
-
-            $user = User::create([
-                'name'=> $data['name'],
-                'surname'=> $data['surname'],
-                'email'=> $data['email'],
-                'password'=> Hash::make($data['password']),
-                'gender' => $data['gender'],
-                'user_type' => $data['userType'],
-            ]);
-
-            return response()->json([
-                'message' => 'user has been created!'
-            ], 200);
-
-        } catch (\Throwable $th) {
-            return response()->json([
-                'message' => $th->getMessage()
-            ], 500);
+        if (! $userToken) {
+            return response()->json(['message' => 'Invalid or inactive account.'], 401);
         }
-
-    }
-
-
-    public function login(array $data)
-    {
-        try {
-
-            $userToken = Auth::attempt(['username' => $data['username'], 'password' => $data['password']]);
-
-            if(!$userToken){
-                return response()->json([
-                    'message' => 'يوجد خطأ فى الاسم او الرقم السرى!',
-                ], 401);
-            }
-
-            if($userToken && Auth::user()->status->value == 0){
-                return response()->json([
-                    'message' => 'هذا الحساب غير مفعل!',
-                ], 401);
-            }
-
-
-            $user = Auth::user();
-            $userRoles = $user->getRoleNames();
-            $role = Role::findByName($userRoles[0]);
-            $roleWithPermissions = $role->permissions;
-
-
-            return $this->buildAuthResponse($userToken);
-
-
-
-        } catch (\Throwable $th) {
-            return response()->json([
-                'message' => $th->getMessage()
-            ], 500);
-        }
-
-    }
-    
-    public function refresh(string $refreshToken)
-    {
-        try {
-            if (!$refreshToken) {
-                return response()->json([
-                    'message' => 'Refresh token mancante o non valido!',
-                ], 401);
-            }
-
-            $newToken = Auth::setToken($refreshToken)->refresh();
-
-            return $this->buildAuthResponse($newToken);
-        } catch (\Throwable $th) {
-            return response()->json([
-                'message' => 'Impossibile aggiornare il token!',
-            ], 401);
-        }
-    }
-
-    public function logout()
-    {
-        Auth::logout();
-
-        return response()->json(['message' => 'you have logged out']);
-    }
-    
-        protected function buildAuthResponse(string $userToken)
-    {
-        Auth::setToken($userToken);
 
         $user = Auth::user();
+        if (! $this->accountAccess->isActive($user)) {
+            Auth::logout();
 
-        if ($user->status->value == 0) {
-            return response()->json([
-                'message' => 'Questo account non e attivo!',
-            ], 401);
+            return response()->json(['message' => 'Invalid or inactive account.'], 401);
         }
 
-        $userRoles = $user->getRoleNames();
-        $role = Role::findByName($userRoles[0]);
-        $expiresIn = Auth::factory()->getTTL() * 60;
+        $refreshSecret = $this->refreshSessions->create($user, $request);
 
-        return response()->json([
-            'token' => $userToken,
-            'refreshToken' => $userToken,
-            'expiresIn' => $expiresIn,
-            'profile' => new UserResource($user),
-            'role' => new RoleResource($role),
-            'permissions' => $this->userPermissionService->getUserPermissions($user),
-        ], 200)->header('Authorization', $userToken);
+        return $this->authResponse($userToken, $user)->withCookie($this->refreshCookie->make($refreshSecret));
     }
 
+    public function refresh(string $refreshSecret, Request $request): JsonResponse
+    {
+        try {
+            $rotation = $this->refreshSessions->rotate($refreshSecret, $request);
+        } catch (RefreshSessionRejected) {
+            return response()->json(['message' => 'Unable to refresh session.'], 401)
+                ->withCookie($this->refreshCookie->forget());
+        }
 
+        $accessToken = Auth::login($rotation->user);
+
+        return $this->authResponse($accessToken, $rotation->user)
+            ->withCookie($this->refreshCookie->make($rotation->secret));
+    }
+
+    public function logout(string $refreshSecret): JsonResponse
+    {
+        $this->refreshSessions->revoke($refreshSecret);
+        $this->invalidateAccessToken();
+
+        return response()->json(['message' => 'you have logged out'])
+            ->withCookie($this->refreshCookie->forget());
+    }
+
+    public function me(User $user): JsonResponse
+    {
+        abort_unless($this->accountAccess->isActive($user), 403);
+
+        return response()->json($this->sessionPayload($user));
+    }
+
+    private function authResponse(string $accessToken, User $user): JsonResponse
+    {
+        return response()->json([
+            'token' => $accessToken,
+            'expiresIn' => Auth::factory()->getTTL() * 60,
+            ...$this->sessionPayload($user),
+        ])->header('Authorization', $accessToken);
+    }
+
+    private function invalidateAccessToken(): void
+    {
+        try {
+            Auth::logout();
+        } catch (JWTException) {
+            return;
+        }
+    }
+
+    private function sessionPayload(User $user): array
+    {
+        $role = $user->roles()->with('permissions')->first();
+
+        return [
+            'profile' => new UserResource($user),
+            'role' => $role ? new RoleResource($role) : null,
+            'roles' => $user->getRoleNames()->values()->all(),
+            'permissions' => $this->userPermissionService->getUserPermissions($user),
+            'accountType' => $user->account_type?->value,
+            'tenant' => $this->tenantSummary($user),
+        ];
+    }
+
+    private function tenantSummary(User $user): ?array
+    {
+        if ($user->account_type !== AccountType::TENANT) {
+            return null;
+        }
+
+        return [
+            'companyId' => $user->company_id,
+            'companyName' => $user->company->name,
+            'usesBranches' => $user->company->uses_branches,
+            'branchId' => $user->branch_id,
+            'branchName' => $user->branch?->name,
+        ];
+    }
 }

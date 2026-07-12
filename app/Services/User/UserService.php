@@ -2,123 +2,200 @@
 
 namespace App\Services\User;
 
+use App\Enums\User\AccountType;
+use App\Enums\User\TenantRole;
 use App\Enums\User\UserStatus;
 use App\Filters\User\FilterUser;
 use App\Filters\User\FilterUserRole;
+use App\Models\Company\Branch;
 use App\Models\User;
+use App\Services\Auth\RefreshSessionService;
+use App\Services\Tenancy\TenantContext;
 use App\Services\Upload\UploadService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class UserService{
+class UserService
+{
+    public function __construct(
+        private readonly UploadService $uploadService,
+        private readonly UserRoleAssignmentValidator $roleValidator,
+        private readonly RefreshSessionService $refreshSessions,
+    ) {}
 
-    private $users;
-    protected $uploadService;
-
-    public function __construct(User $users, UploadService $uploadService)
+    public function allUsers(User $caller)
     {
-        $this->users = $users;
-        $this->uploadService = $uploadService;
+        $users = (new TenantContext($caller))->scopeUsers(User::query());
+
+        return QueryBuilder::for($users)->allowedFilters([
+            AllowedFilter::custom('search', new FilterUser),
+            AllowedFilter::exact('status'),
+            AllowedFilter::custom('role', new FilterUserRole),
+        ])->get();
     }
 
-    public function allUsers()
+    public function createUser(User $caller, array $userFields): User
     {
-        $user = QueryBuilder::for(User::class)
-            ->allowedFilters([
-                AllowedFilter::custom('search', new FilterUser()), // Add a custom search filter
-                AllowedFilter::exact('status'),
-                AllowedFilter::custom('role', new FilterUserRole()),
-            ])->get();
-
-        return $user;
-
-    }
-
-    public function createUser(array $userData): User
-    {
-
-        $avatarPath = null;
-
-        if(isset($userData['avatar']) && $userData['avatar'] instanceof UploadedFile){
-            $avatarPath =  $this->uploadService->uploadFile($userData['avatar'], 'avatars');
-        }
-
+        $context = $this->managementContext($caller);
+        $role = $this->roleValidator->role($caller, (int) $userFields['roleId']);
+        $tenantFields = $this->newAccountTenantFields($caller, $context, $role, $userFields);
         $user = User::create([
-            'name' => $userData['name'],
-            'username' => $userData['username'],
-            'email' => $userData['email'],
-            'phone' => $userData['phone'],
-            'address' => $userData['address'],
-            'password' => $userData['password'],
-            'status' => UserStatus::from($userData['status'])->value,
-            'avatar' => $avatarPath
+            ...$this->profileAttributes($userFields),
+            ...$tenantFields,
+            'avatar' => $this->avatarPath($userFields),
+            'password' => $userFields['password'],
+            'status' => UserStatus::from($userFields['status'])->value,
         ]);
-
-        $role = Role::find($userData['roleId']);
-
-        $user->assignRole($role->id);
+        $user->assignRole($role);
 
         return $user;
-
     }
 
-    public function editUser(int $userId)
+    public function editUser(User $caller, int $userId): User
     {
-        return User::where('id', $userId)->with('roles')->first();
+        return (new TenantContext($caller))->scopeUsers(User::query())
+            ->with('roles')->findOrFail($userId);
     }
 
-    public function updateUser(array $userData): User
+    public function updateUser(User $caller, array $userFields): User
     {
+        $context = $this->managementContext($caller);
+        $user = $context->scopeUsers(User::query())->findOrFail($userFields['userId']);
+        $role = $this->roleValidator->role($caller, (int) $userFields['roleId']);
+        $user->fill($this->profileAttributes($userFields));
+        $user->status = UserStatus::from($userFields['status'])->value;
+        $user->branch_id = $this->updatedBranchId($caller, $user, $role, $userFields);
 
-        $avatarPath = null;
-
-        if(isset($userData['avatar']) && $userData['avatar'] instanceof UploadedFile){
-            $avatarPath =  $this->uploadService->uploadFile($userData['avatar'], $userData['avatar']??'avatars');
+        if (! empty($userFields['password'])) {
+            $user->password = $userFields['password'];
         }
 
-        $user = User::find($userData['userId']);
-        $user->name = $userData['name'];
-        $user->username = $userData['username'];
-        $user->email = $userData['email'];
-        $user->phone = $userData['phone'];
-        $user->address = $userData['address'];
-
-        if($userData['password']){
-            $user->password = $userData['password'];
-        }
-
-        $user->status = UserStatus::from($userData['status'])->value;
-
-        if($avatarPath){
+        if ($avatarPath = $this->avatarPath($userFields)) {
             $user->avatar = $avatarPath;
         }
 
         $user->save();
-
-        $role = Role::find($userData['roleId']);
-
-        $user->syncRoles($role->id);
+        $user->syncRoles($role);
 
         return $user;
-
     }
 
-
-    public function deleteUser(int $userId)
+    public function deleteUser(User $caller, int $userId): bool
     {
+        $context = $this->managementContext($caller);
+        $user = $context->scopeUsers(User::query())->findOrFail($userId);
+        $this->refreshSessions->revokeUser($user);
 
-        return User::find($userId)->delete();
-
+        return (bool) $user->delete();
     }
 
-    public function changeUserStatus(int $userId, int $status)
+    public function changeUserStatus(User $caller, int $userId, int $status): bool
     {
+        $context = $this->managementContext($caller);
+        $user = $context->scopeUsers(User::query())->findOrFail($userId);
 
-        return User::where('id', $userId)->update(['status' => UserStatus::from($status)->value]);
+        $changed = $user->update(['status' => UserStatus::from($status)->value]);
 
+        if ($status === UserStatus::INACTIVE->value) {
+            $this->refreshSessions->revokeUser($user);
+        }
+
+        return $changed;
     }
 
+    private function managementContext(User $caller): TenantContext
+    {
+        $context = new TenantContext($caller);
 
+        if (! $context->canManageBranchAccounts()) {
+            throw new AuthorizationException;
+        }
+
+        return $context;
+    }
+
+    private function newAccountTenantFields(
+        User $caller,
+        TenantContext $context,
+        Role $role,
+        array $userFields
+    ): array {
+        if ($context->isInternal()) {
+            return ['account_type' => AccountType::INTERNAL, 'company_id' => null, 'branch_id' => null];
+        }
+
+        return [
+            'account_type' => AccountType::TENANT,
+            'company_id' => $context->tenantCompanyId(),
+            'branch_id' => $this->authorizedBranchId($caller, $role, $userFields['branchId'] ?? null),
+        ];
+    }
+
+    private function updatedBranchId(User $caller, User $user, Role $role, array $userFields): ?int
+    {
+        if ((new TenantContext($caller))->isInternal()) {
+            return $user->branch_id;
+        }
+
+        return $this->authorizedBranchId($caller, $role, $userFields['branchId'] ?? $user->branch_id);
+    }
+
+    private function authorizedBranchId(User $caller, Role $role, ?int $requestedBranchId): ?int
+    {
+        $context = new TenantContext($caller);
+        $branchId = $caller->hasRole(TenantRole::BRANCH_MANAGER->value)
+            ? $context->tenantBranchId()
+            : $requestedBranchId;
+        if (! $caller->company->uses_branches && $branchId !== null) {
+            throw ValidationException::withMessages(['branchId' => 'This company does not use branches.']);
+        }
+        $branchRequired = $caller->company->uses_branches && in_array($role->name, [
+            TenantRole::BRANCH_MANAGER->value,
+            TenantRole::EMPLOYEE->value,
+        ], true);
+
+        if ($branchRequired && $branchId === null) {
+            throw ValidationException::withMessages(['branchId' => 'A branch is required for this role.']);
+        }
+
+        return $this->validatedBranchId($context, $branchId);
+    }
+
+    private function validatedBranchId(TenantContext $context, ?int $branchId): ?int
+    {
+        if ($branchId === null) {
+            return null;
+        }
+
+        $validBranch = Branch::query()->whereKey($branchId)
+            ->where('company_id', $context->tenantCompanyId())->where('status', 1)->exists();
+
+        if (! $validBranch) {
+            throw ValidationException::withMessages(['branchId' => 'Branch is outside the authorized company.']);
+        }
+
+        return $branchId;
+    }
+
+    private function profileAttributes(array $userFields): array
+    {
+        return [
+            'name' => $userFields['name'],
+            'username' => $userFields['username'],
+            'email' => $userFields['email'],
+            'phone' => $userFields['phone'] ?? null,
+            'address' => $userFields['address'] ?? null,
+        ];
+    }
+
+    private function avatarPath(array $userFields): ?string
+    {
+        return isset($userFields['avatar']) && $userFields['avatar'] instanceof UploadedFile
+            ? $this->uploadService->uploadFile($userFields['avatar'], 'avatars')
+            : null;
+    }
 }

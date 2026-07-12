@@ -4,59 +4,37 @@ namespace App\Http\Controllers\Api\Public\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\RegisterRequest;
 use App\Services\Auth\AuthService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
-
-    protected $authService;
-
-    public function __construct(AuthService $authService)
+    public function __construct(private readonly AuthService $authService)
     {
-        $this->middleware('auth:api', ['except' => ['login', 'register', 'refresh']]);
-        $this->authService = $authService;
+        $this->middleware('auth:api', ['except' => ['login', 'refresh', 'logout']]);
     }
 
-    /*
-    ** register method
-    ** 
-    **
-    */
-    public function register(RegisterRequest $registerReq)
+    public function login(LoginRequest $request): JsonResponse
     {
-        return $this->authService->register($registerReq->validated());
+        return $this->authService->login($request->validated(), $request);
     }
 
-
-    /*
-    ** login method
-    ** 
-    **
-    */
-    public function login(LoginRequest $loginReq)
+    public function logout(Request $request): JsonResponse
     {
-        return $this->authService->login($loginReq->validated());
+        return $this->authService->logout($request->cookie(config('auth_session.cookie_name'), ''));
     }
 
-    
-    /*
-    ** logout method
-    ** 
-    **
-    */
-
-    public function logout()
+    public function me(Request $request): JsonResponse
     {
-        return $this->authService->logout();
-    }
-    
-    public function refresh(Request $request)
-    {
-        $refreshToken = $request->bearerToken() ?: $request->input('refreshToken');
-
-        return $this->authService->refresh($refreshToken);
+        return $this->authService->me($request->user());
     }
 
+    public function refresh(Request $request): JsonResponse
+    {
+        return $this->authService->refresh(
+            $request->cookie(config('auth_session.cookie_name'), ''),
+            $request,
+        );
+    }
 }

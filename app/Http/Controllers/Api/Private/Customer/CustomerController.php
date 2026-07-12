@@ -9,142 +9,76 @@ use App\Http\Resources\Customer\AllCustomerCollection;
 use App\Http\Resources\Customer\CustomerResource;
 use App\Models\Company\Customer;
 use App\Services\Customer\CustomerService;
+use App\Services\Export\ResourceCsvExporter;
 use App\Utils\PaginateCollection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-
 class CustomerController extends Controller
 {
-    protected $customerService;
-    public function __construct(CustomerService $customerService)
-    {
+    public function __construct(
+        private readonly CustomerService $customerService,
+        private readonly ResourceCsvExporter $csv,
+    ) {
         $this->middleware('auth:api');
-        $this->middleware('permission:all_customers', ['only' => ['allCustomers']]);
-        $this->middleware('permission:create_customer', ['only' => ['create']]);
-        $this->middleware('permission:edit_customer', ['only' => ['edit']]);
-        $this->middleware('permission:update_customer', ['only' => ['update']]);
-        $this->middleware('permission:delete_customer', ['only' => ['delete']]);
-        $this->customerService = $customerService;
+        $this->middleware('permission:all_customers')->only('allCustomers');
+        $this->middleware('permission:create_customer')->only('create');
+        $this->middleware('permission:edit_customer')->only('edit');
+        $this->middleware('permission:update_customer')->only('update');
+        $this->middleware('permission:delete_customer')->only('delete');
+        $this->middleware('permission:export_customers|all_customers')->only('export');
     }
 
-    /**
-     * Display a listing of the resource.
-     */
-    public function allCustomers(Request $request)
+    public function export(Request $request)
     {
-        $allCustomers = $this->customerService->allCustomers();
+        $customers = $this->customerService->allCustomers($request->user())->load(['company', 'branch']);
 
-        return response()->json(
-            new AllCustomerCollection(PaginateCollection::paginate($allCustomers, $request->pageSize?$request->pageSize:10))
-        , 200);
-
+        return $this->csv->response('customers', ['Name', 'Email', 'Status', 'Company', 'Branch'],
+            $customers->map(fn (Customer $customer) => [
+                $customer->getFullName(), $customer->email, $customer->status,
+                $customer->company?->name, $customer->branch?->name,
+            ]),
+        );
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-
-    public function create(CreateCustomerRequest $createCustomerRequest)
+    public function allCustomers(Request $request): JsonResponse
     {
+        $customers = $this->customerService->allCustomers($request->user());
 
-        try {
-            DB::beginTransaction();
-
-            $customerData = $createCustomerRequest->validated();
-
-            $customerExists = Customer::where('firstname', $customerData['firstname'])->where('lastname', $customerData['lastname'])->where('company_id', $customerData['companyId'])->first();
-
-            if ($customerExists) {
-
-                return response()->json([
-                    'message' => 'تم اضافة هذه الحساب من قبل'
-                ], 401);
-            }
-
-            $customer = $this->customerService->createCustomer($createCustomerRequest->validated());
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'تم اضافة حساب جديد بنجاح'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(new AllCustomerCollection(
+            PaginateCollection::paginate($customers, $request->integer('pageSize', 10)),
+        ));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-
-    public function edit(Request $request)
+    public function create(CreateCustomerRequest $request): JsonResponse
     {
-        $customer  =  $this->customerService->editCustomer($request->customerId);
+        DB::transaction(fn () => $this->customerService->createCustomer($request->user(), $request->validated()));
 
-        return response()->json(
-            new CustomerResource($customer)//new UserResource($user)
-        ,200);
-
+        return response()->json(['message' => 'تم اضافة حساب جديد بنجاح']);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateCustomerRequest $updateCustomerRequest)
+    public function edit(Request $request): JsonResponse
     {
+        $customer = $this->customerService->editCustomer($request->user(), $request->integer('customerId'));
 
-        try {
-            DB::beginTransaction();
-
-            $customerData = $updateCustomerRequest->validated();
-            $customerExists = Customer::where('firstname', $customerData['firstname'])->where('lastname', $customerData['lastname'])->where('company_id', $customerData['companyId'])->whereNot('id', $customerData['customerId'])->first();
-
-            if ($customerExists) {
-
-                return response()->json([
-                    'message' => 'تم اضافة هذه الحساب من قبل'
-                ]);
-            }
-
-            $this->customerService->updateCustomer($customerData);
-
-            DB::commit();
-            return response()->json([
-                 'message' => 'تم تحديث بيانات الحساب!'
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(new CustomerResource($customer));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function delete(Request $request)
+    public function update(UpdateCustomerRequest $request): JsonResponse
     {
+        DB::transaction(fn () => $this->customerService->updateCustomer($request->user(), $request->validated()));
 
-        try {
-            DB::beginTransaction();
-            $this->customerService->deleteCustomer($request->customerId);
-            DB::commit();
-            return response()->json([
-                'message' => 'تم حذف الحساب بنجاح!'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'تم تحديث بيانات الحساب!']);
     }
 
+    public function delete(Request $request): JsonResponse
+    {
+        DB::transaction(fn () => $this->customerService->deleteCustomer(
+            $request->user(),
+            $request->integer('customerId'),
+        ));
+
+        return response()->json(['message' => 'تم حذف الحساب بنجاح!']);
+    }
 }

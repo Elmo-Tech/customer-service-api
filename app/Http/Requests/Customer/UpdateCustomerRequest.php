@@ -3,11 +3,10 @@
 namespace App\Http\Requests\Customer;
 
 use App\Enums\Company\CustomerStatus;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\Rules\Enum;
-
 
 class UpdateCustomerRequest extends FormRequest
 {
@@ -28,20 +27,20 @@ class UpdateCustomerRequest extends FormRequest
     {
         return [
             'customerId' => 'required',
-            'firstname' =>['required'],
-            'lastname' =>['required'],
-            'pin' =>['required'],
+            'firstname' => ['required'],
+            'lastname' => ['required'],
+            'pin' => ['required'],
             'companyId' => 'required',
+            'branchId' => ['nullable', 'integer'],
             'status' => ['required', new Enum(CustomerStatus::class)],
-            'email' =>['nullable', 'email'],
+            'email' => ['nullable', 'email'],
         ];
     }
 
     public function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
+            'message' => $validator->errors(),
         ], 401));
     }
-
 }

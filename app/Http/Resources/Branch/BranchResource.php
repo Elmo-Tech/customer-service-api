@@ -17,8 +17,9 @@ class BranchResource extends JsonResource
 
         return [
             'branchId' => $this->id,
-            'name' => $this->name??"",
+            'name' => $this->name ?? '',
             'status' => $this->status,
+            'companyId' => $this->company_id,
         ];
     }
 }

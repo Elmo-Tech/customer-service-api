@@ -3,11 +3,10 @@
 namespace App\Http\Requests\Company;
 
 use App\Enums\Company\CompanyStatus;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\Rules\Enum;
-
 
 class CreateCompanyRequest extends FormRequest
 {
@@ -27,17 +26,17 @@ class CreateCompanyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' =>['required', "unique:companies,name"],
+            'name' => ['required', 'unique:companies,name'],
             'status' => ['required', new Enum(CompanyStatus::class)],
-            'branches' => ''
+            'usesBranches' => ['sometimes', 'boolean'],
+            'branches' => ['sometimes', 'array'],
         ];
     }
 
     public function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
+            'message' => $validator->errors(),
         ], 401));
     }
-
 }

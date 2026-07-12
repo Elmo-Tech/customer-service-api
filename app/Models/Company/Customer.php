@@ -3,6 +3,7 @@
 namespace App\Models\Company;
 
 use App\Enums\Company\CustomerStatus;
+use App\Models\User;
 use App\Traits\CreatedUpdatedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
 {
-    use HasFactory, SoftDeletes, CreatedUpdatedBy;
+    use CreatedUpdatedBy, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'firstname',
@@ -19,11 +20,13 @@ class Customer extends Model
         'pin',
         'status',
         'company_id',
-        'email'
+        'branch_id',
+        'email',
+        'user_id',
     ];
 
     protected $cast = [
-        'status' => CustomerStatus::class
+        'status' => CustomerStatus::class,
     ];
 
     public function company(): BelongsTo
@@ -31,10 +34,18 @@ class Customer extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function getFullName(){
-
-        return $this->firstname . " " . $this->lastname;
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
 
+    public function getFullName()
+    {
+        return $this->firstname.' '.$this->lastname;
+    }
 }

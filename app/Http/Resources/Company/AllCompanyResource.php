@@ -16,11 +16,11 @@ class AllCompanyResource extends JsonResource
     public function toArray(Request $request): array
     {
 
-
         return [
             'companyId' => $this->id,
             'name' => $this->name,
             'status' => $this->status,
+            'usesBranches' => $this->uses_branches,
             'branches' => BranchResource::collection($this->whenLoaded('branches')),
         ];
     }

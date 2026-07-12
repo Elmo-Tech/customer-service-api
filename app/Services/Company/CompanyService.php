@@ -5,69 +5,69 @@ namespace App\Services\Company;
 use App\Enums\Company\CompanyStatus;
 use App\Filters\Company\FilterCompany;
 use App\Models\Company\Company;
+use App\Models\User;
+use App\Services\Tenancy\TenantContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class CompanyService{
-
-    private $company;
-    public function __construct(Company $company)
+class CompanyService
+{
+    public function allCompanies(User $caller)
     {
-        $this->company = $company;
-    }
+        $companies = (new TenantContext($caller))->scopeCompanies(Company::query())->with('branches');
 
-    public function allCompanies()
-    {
-        $companies = QueryBuilder::for(Company::class)
-        ->with('branches')
-        ->allowedFilters([
-            AllowedFilter::custom('search', new FilterCompany()), // Add a custom search filter
+        return QueryBuilder::for($companies)->allowedFilters([
+            AllowedFilter::custom('search', new FilterCompany),
             AllowedFilter::exact('status'),
         ])->get();
-
-        return $companies;
-
     }
 
-    public function createCompany(array $companyData): Company
+    public function createCompany(User $caller, array $companyFields): Company
     {
+        $this->assertInternal($caller);
 
-        $company = Company::create([
-            'name' => $companyData['name'],
-            'status' => CompanyStatus::from($companyData['status'])->value,
+        return Company::create([
+            'name' => $companyFields['name'],
+            'status' => CompanyStatus::from($companyFields['status'])->value,
+            'uses_branches' => $companyFields['usesBranches'] ?? true,
         ]);
-
-        return $company;
-
     }
 
-    public function editCompany(int $companyId)
+    public function editCompany(User $caller, int $companyId): Company
     {
-        return Company::with('branches')->find($companyId);
+        return (new TenantContext($caller))->scopeCompanies(Company::query())
+            ->with('branches')->findOrFail($companyId);
     }
 
-    public function updateCompany(array $companyData): Company
+    public function updateCompany(User $caller, array $companyFields): Company
     {
+        $context = new TenantContext($caller);
 
-        $company = Company::find($companyData['companyId']);
+        if (! $context->canManageCompany()) {
+            throw new AuthorizationException;
+        }
 
+        $company = $context->scopeCompanies(Company::query())->findOrFail($companyFields['companyId']);
         $company->update([
-            'name' => $companyData['name'],
-            'status' => CompanyStatus::from($companyData['status'])->value,
+            'name' => $companyFields['name'],
+            'status' => CompanyStatus::from($companyFields['status'])->value,
         ]);
 
         return $company;
-
-
     }
 
-
-    public function deleteCompany(int $companyId)
+    public function deleteCompany(User $caller, int $companyId): bool
     {
+        $this->assertInternal($caller);
 
-        return Company::find($companyId)->delete();
-
+        return (bool) Company::query()->findOrFail($companyId)->delete();
     }
 
-
+    private function assertInternal(User $caller): void
+    {
+        if (! (new TenantContext($caller))->isInternal()) {
+            throw new AuthorizationException;
+        }
+    }
 }

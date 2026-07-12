@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\User;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\Rules\Password;
 
 class UpdateUserRequest extends FormRequest
@@ -27,26 +27,26 @@ class UpdateUserRequest extends FormRequest
         return [
             'userId' => 'required',
             'name' => 'required',
-            'username'=> ['required', "unique:users,username,{$this->userId}"],
-            'email'=> ['required', "unique:users,email,{$this->userId}"],
+            'username' => ['required', "unique:users,username,{$this->userId}"],
+            'email' => ['required', "unique:users,email,{$this->userId}"],
             'phone' => '',
             'address' => '',
             'status' => 'required',
-            'password'=> [
+            'password' => [
                 'sometimes',
                 'nullable',
                 Password::min(8)->mixedCase()->numbers()->symbols()->uncompromised(),
             ],
-            'roleId'=> 'required',
-            'avatar' => ["sometimes", "nullable","image", "mimes:jpeg,jpg,png,gif", "max:2048"],
+            'roleId' => 'required',
+            'branchId' => ['nullable', 'integer'],
+            'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,jpg,png,gif', 'max:2048'],
         ];
     }
 
     public function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
+            'message' => $validator->errors(),
         ], 401));
     }
-
 }

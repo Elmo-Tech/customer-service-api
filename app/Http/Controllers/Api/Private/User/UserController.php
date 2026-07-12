@@ -5,143 +5,90 @@ namespace App\Http\Controllers\Api\Private\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
-use App\Http\Resources\User\AllUserDataResource;
 use App\Http\Resources\User\AllUserCollection;
-use App\Utils\PaginateCollection;
+use App\Http\Resources\User\AllUserDataResource;
+use App\Models\User;
+use App\Services\Export\ResourceCsvExporter;
 use App\Services\User\UserService;
+use App\Utils\PaginateCollection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-
 class UserController extends Controller
 {
-    protected $userService;
-
-    public function __construct(UserService $userService)
-    {
+    public function __construct(
+        private readonly UserService $userService,
+        private readonly ResourceCsvExporter $csv,
+    ) {
         $this->middleware('auth:api');
-        $this->middleware('permission:all_users', ['only' => ['allUsers']]);
-        $this->middleware('permission:create_user', ['only' => ['create']]);
-        $this->middleware('permission:edit_user', ['only' => ['edit']]);
-        $this->middleware('permission:update_user', ['only' => ['update']]);
-        $this->middleware('permission:delete_user', ['only' => ['delete']]);
-        $this->middleware('permission:change_user_status', ['only' => ['changeStatus']]);
-        $this->userService = $userService;
+        $this->middleware('permission:all_users')->only('allUsers');
+        $this->middleware('permission:create_user')->only('create');
+        $this->middleware('permission:edit_user')->only('edit');
+        $this->middleware('permission:update_user')->only('update');
+        $this->middleware('permission:delete_user')->only('delete');
+        $this->middleware('permission:change_user_status')->only('changeStatus');
+        $this->middleware('permission:export_users|all_users')->only('export');
     }
 
-    /**
-     * Display a listing of the resource.
-     */
-    public function allUsers(Request $request)
+    public function export(Request $request)
     {
-        $allUsers = $this->userService->allUsers();
+        $users = $this->userService->allUsers($request->user())->load(['company', 'branch', 'roles']);
 
-        return response()->json(
-            new AllUserCollection(PaginateCollection::paginate($allUsers, $request->pageSize?$request->pageSize:10))
-        , 200);
-
+        return $this->csv->response('users', ['Name', 'Username', 'Email', 'Status', 'Company', 'Branch', 'Role'],
+            $users->map(fn (User $user) => [
+                $user->name, $user->username, $user->email, $user->status->value,
+                $user->company?->name, $user->branch?->name, $user->roles->first()?->name,
+            ]),
+        );
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-
-    public function create(CreateUserRequest $createUserRequest)
+    public function allUsers(Request $request): JsonResponse
     {
+        $users = $this->userService->allUsers($request->user());
 
-        try {
-            DB::beginTransaction();
-
-            $this->userService->createUser($createUserRequest->validated());
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'تم اضافة مستخدم جديد بنجاح'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(new AllUserCollection(
+            PaginateCollection::paginate($users, $request->integer('pageSize', 10)),
+        ));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-
-    public function edit(Request $request)
+    public function create(CreateUserRequest $request): JsonResponse
     {
-        $user  =  $this->userService->editUser($request->userId);
+        DB::transaction(fn () => $this->userService->createUser($request->user(), $request->validated()));
 
-        return response()->json(
-            new AllUserDataResource($user)//new UserResource($user)
-        ,200);
-
+        return response()->json(['message' => 'تم اضافة مستخدم جديد بنجاح']);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateUserRequest $updateUserRequest)
+    public function edit(Request $request): JsonResponse
     {
+        $user = $this->userService->editUser($request->user(), $request->integer('userId'));
 
-        try {
-            DB::beginTransaction();
-            $this->userService->updateUser($updateUserRequest->validated());
-            DB::commit();
-            return response()->json([
-                 'message' => 'تم تحديث بيانات المستخدم!'
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(new AllUserDataResource($user));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function delete(Request $request)
+    public function update(UpdateUserRequest $request): JsonResponse
     {
+        DB::transaction(fn () => $this->userService->updateUser($request->user(), $request->validated()));
 
-        try {
-            DB::beginTransaction();
-            $this->userService->deleteUser($request->userId);
-            DB::commit();
-            return response()->json([
-                'message' => 'تم حذف المستخدم بنجاح!'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'تم تحديث بيانات المستخدم!']);
     }
 
-    public function changeStatus(Request $request)
+    public function delete(Request $request): JsonResponse
     {
+        DB::transaction(fn () => $this->userService->deleteUser($request->user(), $request->integer('userId')));
 
-        try {
-            DB::beginTransaction();
-            $this->userService->changeUserStatus($request->userId, $request->status);
-            DB::commit();
-
-            return response()->json([
-                'message' => 'تم تغيير حالة المستخدم!'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
+        return response()->json(['message' => 'تم حذف المستخدم بنجاح!']);
     }
 
+    public function changeStatus(Request $request): JsonResponse
+    {
+        $statusFields = $request->validate(['userId' => 'required|integer', 'status' => 'required|integer|in:0,1']);
+        DB::transaction(fn () => $this->userService->changeUserStatus(
+            $request->user(),
+            (int) $statusFields['userId'],
+            (int) $statusFields['status'],
+        ));
+
+        return response()->json(['message' => 'تم تغيير حالة المستخدم!']);
+    }
 }

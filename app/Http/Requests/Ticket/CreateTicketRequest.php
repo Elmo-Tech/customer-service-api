@@ -2,13 +2,12 @@
 
 namespace App\Http\Requests\Ticket;
 
-use App\Enums\Ticket\TicketStatus;
 use App\Enums\Ticket\TicketImportanceStatus;
+use App\Enums\Ticket\TicketStatus;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\Rules\Enum;
-
 
 class CreateTicketRequest extends FormRequest
 {
@@ -34,7 +33,7 @@ class CreateTicketRequest extends FormRequest
             'customerId' => ['required'],
             'pin' => ['required'],
             'companyId' => ['required'],
-            'branchId' => ['required'],
+            'branchId' => ['nullable', 'integer'],
             'attachments' => ['nullable'],
             'tagId' => ['nullable'],
         ];
@@ -43,8 +42,7 @@ class CreateTicketRequest extends FormRequest
     public function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
+            'message' => $validator->errors(),
         ], 401));
     }
-
 }

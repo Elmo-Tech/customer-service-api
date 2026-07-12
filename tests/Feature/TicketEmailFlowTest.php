@@ -2,19 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Company\CompanyStatus;
+use App\Enums\Company\CustomerStatus;
 use App\Enums\Ticket\TicketImportanceStatus;
 use App\Enums\Ticket\TicketStatus;
+use App\Enums\User\AccountType;
 use App\Mail\ClosedTicketDetails;
 use App\Mail\TicketDetails;
-use App\Models\Company\Branch;
 use App\Models\Company\Company;
 use App\Models\Company\Customer;
 use App\Models\Tiket\Ticket;
+use App\Models\Tiket\TicketReviewCapability;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class TicketEmailFlowTest extends TestCase
@@ -28,7 +31,8 @@ class TicketEmailFlowTest extends TestCase
         $ticket = $this->makeTicket();
         $ticket->attachments()->create(['path' => "tickets/{$ticket->id}/screenshot.png"]);
 
-        $this->withoutMiddleware()
+        $this->actingAs(User::findOrFail(1), 'api')
+            ->withoutMiddleware()
             ->putJson('/api/v1/admin/tickets/update', [
                 'ticketId' => $ticket->id,
                 'status' => TicketStatus::DONE->value,
@@ -49,13 +53,14 @@ class TicketEmailFlowTest extends TestCase
         Mail::assertSent(ClosedTicketDetails::class, fn ($mail) => $mail->hasTo('mr10dev10@gmail.com') && count($mail->attachments()) === 1);
         Mail::assertSent(ClosedTicketDetails::class, fn ($mail) => $mail->hasTo('customer@example.com'));
 
-        $this->assertNotNull($ticket->fresh()->token);
+        $this->assertNull($ticket->fresh()->token);
+        $this->assertSame(1, TicketReviewCapability::query()->where('ticket_id', $ticket->id)->count());
     }
 
     public function test_created_ticket_emails_include_uploaded_attachments(): void
     {
         Mail::fake();
-        Storage::fake('public');
+        Storage::fake('ticket_attachments');
 
         $customer = $this->makeCustomer();
 
@@ -75,6 +80,9 @@ class TicketEmailFlowTest extends TestCase
 
         Mail::assertSent(TicketDetails::class, 5);
         Mail::assertSent(TicketDetails::class, fn ($mail) => $mail->hasTo('it-arca@arcagroup.eu') && count($mail->attachments()) === 1);
+        $attachment = Ticket::query()->latest('id')->firstOrFail()->attachments()->firstOrFail();
+        $this->assertSame('private', $attachment->storage_disk);
+        Storage::disk('ticket_attachments')->assertExists($attachment->path);
     }
 
     public function test_reopened_ticket_sends_expected_internal_emails(): void
@@ -115,7 +123,8 @@ class TicketEmailFlowTest extends TestCase
         $this->makeTicket(['status' => TicketStatus::DONE->value]);
         $this->makeTicket(['status' => TicketStatus::IN_PROGRESS->value]);
 
-        $response = $this->withoutMiddleware()
+        $response = $this->actingAs(User::findOrFail(1), 'api')
+            ->withoutMiddleware()
             ->getJson('/api/v1/admin/tickets?filter[status]=0')
             ->assertOk();
 
@@ -158,10 +167,11 @@ class TicketEmailFlowTest extends TestCase
             'username' => 'admin',
             'email' => 'admin@example.com',
             'password' => 'password',
+            'account_type' => AccountType::INTERNAL,
         ]);
 
-        $company = Company::create(['name' => 'Acme']);
-        $company->branches()->create(['name' => 'Main']);
+        $company = Company::create(['name' => 'Acme', 'status' => CompanyStatus::ACTIVE->value]);
+        $company->branches()->create(['name' => 'Main', 'status' => 1]);
 
         return Customer::create([
             'firstname' => 'Mario',
@@ -169,6 +179,7 @@ class TicketEmailFlowTest extends TestCase
             'pin' => '1234',
             'company_id' => $company->id,
             'email' => 'customer@example.com',
+            'status' => CustomerStatus::ACTIVE->value,
         ]);
     }
 }

@@ -12,15 +12,15 @@ class SelectController extends Controller
 
     public function __construct(SelectService $selectService)
     {
+        $this->middleware('auth:api');
         $this->selectService = $selectService;
     }
 
     public function getSelects(Request $request)
     {
-        $selectData = $this->selectService->getSelects($request->allSelects);
+        $request->validate(['allSelects' => 'required|string']);
+        $selectData = $this->selectService->getSelects($request->allSelects, $request->user());
 
         return response()->json($selectData);
     }
-
-
 }

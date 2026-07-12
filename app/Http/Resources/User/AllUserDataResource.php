@@ -17,19 +17,21 @@ class AllUserDataResource extends JsonResource
     public function toArray(Request $request): array
     {
 
-
-        //dd($userData);
+        // dd($userData);
 
         return [
             'userId' => $this->id,
-            'name' => $this->name??"",
-            'username' => $this->username??"",
-            'email' => $this->email??"",
-            'phone' => $this->phone??"",
-            'address' => $this->address??"",
+            'name' => $this->name ?? '',
+            'username' => $this->username ?? '',
+            'email' => $this->email ?? '',
+            'phone' => $this->phone ?? '',
+            'address' => $this->address ?? '',
             'status' => $this->status,
-            'avatar' => $this->avatar?Storage::disk('public')->url($this->avatar):"",
+            'avatar' => $this->avatar ? Storage::disk('public')->url($this->avatar) : '',
             'roleId' => RoleResource::collection($this->whenLoaded('roles'))[0]->id,
+            'accountType' => $this->account_type?->value,
+            'companyId' => $this->company_id,
+            'branchId' => $this->branch_id,
         ];
     }
 }

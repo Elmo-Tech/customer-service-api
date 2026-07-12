@@ -4,70 +4,80 @@ namespace App\Services\Company;
 
 use App\Enums\Company\BranchStatus;
 use App\Models\Company\Branch;
-use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\QueryBuilder;
+use App\Models\Company\Company;
+use App\Models\User;
+use App\Services\Tenancy\TenantContext;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Validation\ValidationException;
 
-class BranchService{
-
-    private $branch;
-    public function __construct(Branch $branch)
+class BranchService
+{
+    public function createBranch(User $caller, array $branchFields): Branch
     {
-        $this->branch = $branch;
-    }
+        $context = $this->managementContext($caller);
+        $companyId = $context->isInternal()
+            ? (int) $branchFields['companyId']
+            : $context->tenantCompanyId();
+        $this->assertBranchCreationAllowed($context, $companyId);
 
-    /*public function allCountries()
-    {
-        $user = QueryBuilder::for(Branch::class)
-            ->allowedFilters([
-                AllowedFilter::custom('search', new FilterBranch()), // Add a custom search filter
-                AllowedFilter::exact('status'),
-            ])->get();
-
-        return $user;
-
-    }*/
-
-    public function createBranch(array $branchData): Branch
-    {
-
-        $branch = Branch::create([
-            'name' => $branchData['name'],
-            'status' => BranchStatus::from($branchData['status'])->value,
-            'company_id' => $branchData['companyId']
+        return Branch::create([
+            'name' => $branchFields['name'],
+            'status' => BranchStatus::from($branchFields['status'])->value,
+            'company_id' => $companyId,
         ]);
-
-        return $branch;
-
     }
 
-    public function editBranch(int $branchId)
+    public function editBranch(User $caller, int $branchId): Branch
     {
-        return Branch::find($branchId);
+        return (new TenantContext($caller))->scopeBranches(Branch::query())->findOrFail($branchId);
     }
 
-    public function updateBranch(array $branchData): Branch
+    public function updateBranch(User $caller, array $branchFields): Branch
     {
-
-        $branch = Branch::find($branchData['branchId']);
-
+        $context = $this->managementContext($caller);
+        $branch = $context->scopeBranches(Branch::query())->findOrFail($branchFields['branchId']);
+        $this->assertUnchangedCompany($branch, $branchFields);
         $branch->update([
-            'name' => $branchData['name'],
-            'status' => BranchStatus::from($branchData['status'])->value,
-            'company_id' => $branchData['companyId']
+            'name' => $branchFields['name'],
+            'status' => BranchStatus::from($branchFields['status'])->value,
         ]);
 
         return $branch;
-
-
     }
 
-
-    public function deleteBranch(int $branchId)
+    public function deleteBranch(User $caller, int $branchId): bool
     {
+        $context = $this->managementContext($caller);
 
-        return Branch::find($branchId)->delete();
-
+        return (bool) $context->scopeBranches(Branch::query())->findOrFail($branchId)->delete();
     }
 
+    private function managementContext(User $caller): TenantContext
+    {
+        $context = new TenantContext($caller);
 
+        if (! $context->canManageCompany()) {
+            throw new AuthorizationException;
+        }
+
+        return $context;
+    }
+
+    private function assertBranchCreationAllowed(TenantContext $context, int $companyId): void
+    {
+        if (! $context->canAccessCompany($companyId)) {
+            throw ValidationException::withMessages(['companyId' => 'Company is outside the authorized scope.']);
+        }
+
+        if (! Company::query()->findOrFail($companyId)->uses_branches) {
+            throw ValidationException::withMessages(['companyId' => 'This company does not use branches.']);
+        }
+    }
+
+    private function assertUnchangedCompany(Branch $branch, array $branchFields): void
+    {
+        if (isset($branchFields['companyId']) && (int) $branchFields['companyId'] !== (int) $branch->company_id) {
+            throw ValidationException::withMessages(['companyId' => 'Branch company cannot be changed.']);
+        }
+    }
 }

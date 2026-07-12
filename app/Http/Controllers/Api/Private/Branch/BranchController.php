@@ -7,104 +7,47 @@ use App\Http\Requests\Branch\CreateBranchRequest;
 use App\Http\Requests\Branch\UpdateBranchRequest;
 use App\Http\Resources\Branch\BranchResource;
 use App\Services\Company\BranchService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-
 class BranchController extends Controller
 {
-    protected $BranchService;
-    protected $branchService;
-
-    public function __construct(BranchService $branchService)
+    public function __construct(private readonly BranchService $branchService)
     {
         $this->middleware('auth:api');
-        $this->middleware('permission:create_branch', ['only' => ['create']]);
-        $this->middleware('permission:edit_branch', ['only' => ['edit']]);
-        $this->middleware('permission:update_branch', ['only' => ['update']]);
-        $this->middleware('permission:delete_branch', ['only' => ['delete']]);
-        $this->branchService = $branchService;
+        $this->middleware('permission:create_branch')->only('create');
+        $this->middleware('permission:edit_branch')->only('edit');
+        $this->middleware('permission:update_branch')->only('update');
+        $this->middleware('permission:delete_branch')->only('delete');
     }
 
-    public function create(CreateBranchRequest $createBranchRequest)
+    public function create(CreateBranchRequest $request): JsonResponse
     {
+        DB::transaction(fn () => $this->branchService->createBranch($request->user(), $request->validated()));
 
-        try {
-            DB::beginTransaction();
-
-            $branch = $this->branchService->createBranch($createBranchRequest->validated());
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'تم اضافة فرع جديد بنجاح'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'تم اضافة فرع جديد بنجاح']);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-
-    public function edit(Request $request)
+    public function edit(Request $request): JsonResponse
     {
-        //dd($request->branchId);
-        $Branch  =  $this->branchService->editBranch($request->branchId);
+        $branch = $this->branchService->editBranch($request->user(), $request->integer('branchId'));
 
-        return response()->json(
-            new BranchResource($Branch)//new UserResource($user)
-        ,200);
-
+        return response()->json(new BranchResource($branch));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateBranchRequest $updateBranchRequest)
+    public function update(UpdateBranchRequest $request): JsonResponse
     {
+        DB::transaction(fn () => $this->branchService->updateBranch($request->user(), $request->validated()));
 
-        try {
-            DB::beginTransaction();
-            $this->branchService->updateBranch($updateBranchRequest->validated());
-
-            DB::commit();
-            return response()->json([
-                 'message' => 'تم تحديث بيانات الفرع!'
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'تم تحديث بيانات الفرع!']);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function delete(Request $request)
+    public function delete(Request $request): JsonResponse
     {
+        $branchId = $request->integer('branchId') ?: $request->integer('BranchId');
+        DB::transaction(fn () => $this->branchService->deleteBranch($request->user(), $branchId));
 
-        try {
-            DB::beginTransaction();
-            $this->branchService->deleteBranch($request->BranchId);
-            DB::commit();
-            return response()->json([
-                'message' => 'تم حذف الفرع بنجاح!'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-
+        return response()->json(['message' => 'تم حذف الفرع بنجاح!']);
     }
-
 }

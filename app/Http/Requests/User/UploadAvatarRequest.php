@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\User;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\Rule;
 
 class UploadAvatarRequest extends FormRequest
@@ -25,39 +25,38 @@ class UploadAvatarRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'avatar' => ["sometimes", "required", "image", "mimes:jpeg,jpg,png,gif", "max:2048"],
-            //'uploadPath' => '',
+            'avatar' => ['sometimes', 'required', 'image', 'mimes:jpeg,jpg,png,gif', 'max:2048'],
+            // 'uploadPath' => '',
         ];
     }
 
-/*public function rules(): array
-{
-    $rules = [
-        'avatar' => [
-            'sometimes',
-            'required',
-            'mimes:jpeg,jpg,png,gif',
-            'max:2048',
-        ],
-        'uploadPath' => '',
-    ];
+    /*public function rules(): array
+    {
+        $rules = [
+            'avatar' => [
+                'sometimes',
+                'required',
+                'mimes:jpeg,jpg,png,gif',
+                'max:2048',
+            ],
+            'uploadPath' => '',
+        ];
 
-    if ($this->isMethod('post')) {
-        // For POST requests, enforce the 'image' rule
-        $rules['avatar'][] = 'image';
-    } elseif ($this->isMethod('put')) {
-        // For PUT requests, allow either 'string' or 'image'
-        $rules['avatar'][] = Rule::in(['string', 'image']);
-    }
+        if ($this->isMethod('post')) {
+            // For POST requests, enforce the 'image' rule
+            $rules['avatar'][] = 'image';
+        } elseif ($this->isMethod('put')) {
+            // For PUT requests, allow either 'string' or 'image'
+            $rules['avatar'][] = Rule::in(['string', 'image']);
+        }
 
-        return $rules;
-    }*/
-
+            return $rules;
+        }*/
 
     public function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
+            'message' => $validator->errors(),
         ], 401));
     }
 
@@ -70,13 +69,13 @@ class UploadAvatarRequest extends FormRequest
         ]);
     }*/
 
-   /*public function validated($key = null, $default = null)
-    {
+    /*public function validated($key = null, $default = null)
+     {
 
-        return array_merge(parent::validated(),[
-            'file' => $this->file('avatar'),
-            'yttttt' => $this->uploadPath,
-        ]);
-    }*/
+         return array_merge(parent::validated(),[
+             'file' => $this->file('avatar'),
+             'yttttt' => $this->uploadPath,
+         ]);
+     }*/
 
 }

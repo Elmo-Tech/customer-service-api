@@ -4,115 +4,118 @@ namespace App\Services\Ticket;
 
 use App\Enums\Ticket\TicketImportanceStatus;
 use App\Enums\Ticket\TicketStatus;
-use App\Filters\Ticket\FilterTicket;
+use App\Models\Company\Customer;
 use App\Models\Tiket\Ticket;
-use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\User;
+use App\Services\Tenancy\TenantContext;
+use Illuminate\Validation\ValidationException;
 
-class TicketService{
+class TicketService
+{
+    public function __construct(
+        private readonly TicketReferenceValidator $referenceValidator,
+        private readonly AuthorizedTicketQuery $ticketQuery,
+    ) {}
 
-    private $ticket;
-    public function __construct(Ticket $ticket)
+    public function allTickets(User $user, array $filters)
     {
-        $this->ticket = $ticket;
-    }
-
-    public function allTickets()
-    {
-        $tickets = QueryBuilder::for(Ticket::class)
-            ->allowedFilters([
-                AllowedFilter::custom('search', new FilterTicket()),
-                AllowedFilter::callback('status', function (Builder $query, $value) {
-                    $status = is_array($value) ? reset($value) : $value;
-
-                    if ((string) $status === (string) TicketStatus::OPENED->value) {
-                        $query->whereIn('status', [
-                            TicketStatus::OPENED->value,
-                            TicketStatus::REOPENED->value,
-                        ]);
-                        return;
-                    }
-
-                    $query->where('status', $status);
-                }),
-                AllowedFilter::exact('importance'),
-                AllowedFilter::exact('company', 'company_id'),
-                AllowedFilter::exact('tag', 'tag_id'),
-                AllowedFilter::exact('customer', 'customer_id'),
-    
-AllowedFilter::callback('fromDate', function (Builder $query, $value) {
-    $query->whereDate('real_closed_at', '>=', $value);
-}),
-
-AllowedFilter::callback('toDate', function (Builder $query, $value) {
-    $query->whereDate('real_closed_at', '<=', $value);
-}),            ])
-            ->orderBy('created_at', 'desc')
-            ->get();
-    
-        return $tickets;
+        return $this->ticketQuery->filtered($user, $filters)->orderBy('created_at', 'desc')->get();
     }
 
     public function createTicket(array $ticketData): Ticket
     {
+        $this->referenceValidator->validate(
+            $ticketData['companyId'],
+            $ticketData['customerId'],
+            $ticketData['branchId'] ?? null,
+        );
 
-        $ticket = Ticket::create([
+        return Ticket::create([
             'company_id' => $ticketData['companyId'],
             'status' => TicketStatus::from($ticketData['status'])->value,
             'importance' => TicketImportanceStatus::from($ticketData['importance'])->value,
             'description' => $ticketData['description'],
             'customer_id' => $ticketData['customerId'],
-            'branch_id' => $ticketData['branchId'],
+            'branch_id' => $ticketData['branchId'] ?? null,
             'closed_at' => null,
-            'tag_id' => $ticketData['tagId']??null,
-            'real_closed_at' => TicketStatus::from($ticketData['status'])->value == 1 ? now():null
+            'tag_id' => $ticketData['tagId'] ?? null,
+            'opened_by_user_id' => $ticketData['openedByUserId'] ?? null,
+            'real_closed_at' => TicketStatus::from($ticketData['status']) === TicketStatus::DONE ? now() : null,
+        ]);
+    }
+
+    public function createAuthenticatedTicket(User $user, array $ticketData): Ticket
+    {
+        $context = new TenantContext($user);
+        $companyId = $context->tenantCompanyId();
+        $context->scopeCustomers(Customer::query())->findOrFail($ticketData['customerId']);
+        $branchId = $user->branch_id
+            ? $context->tenantBranchId()
+            : ($ticketData['branchId'] ?? null);
+
+        $ticket = $this->createTicket([
+            ...$ticketData,
+            'companyId' => $companyId,
+            'branchId' => $branchId,
+            'status' => TicketStatus::OPENED->value,
+            'openedByUserId' => $user->id,
         ]);
 
         return $ticket;
-
     }
 
-    public function editTicket(int $ticketId)
+    public function editTicket(User $user, int $ticketId): Ticket
     {
-        return Ticket::with(['attachments', 'customer'])->find($ticketId);
+        return $this->ticketQuery->filtered($user, [])
+            ->with(['attachments', 'customer'])
+            ->findOrFail($ticketId);
     }
 
-    public function updateTicket(array $ticketData): Ticket
+    public function findTicket(User $user, int $ticketId): Ticket
     {
+        return $this->ticketQuery->filtered($user, [])->findOrFail($ticketId);
+    }
 
-        $ticket = Ticket::find($ticketData['ticketId']);
-    
-        $closedAt = $ticketData['closedAt']??null;
-        
-        if(TicketStatus::from($ticketData['status'])->value == 1 && !isset($ticketData['closedAt'])){
-            $closedAt = now();
+    public function updateTicket(User $user, array $ticketData): Ticket
+    {
+        $ticket = $this->ticketQuery->filtered($user, [])->findOrFail($ticketData['ticketId']);
+        $this->validateImmutableCompany($ticket, $ticketData);
+        $this->referenceValidator->validate(
+            $ticket->company_id,
+            $ticketData['customerId'],
+            $ticketData['branchId'] ?? null,
+        );
+        $ticket->update($this->updatedAttributes($ticketData));
+
+        return $ticket;
+    }
+
+    public function deleteTicket(User $user, int $ticketId): bool
+    {
+        return (bool) $this->ticketQuery->filtered($user, [])->findOrFail($ticketId)->delete();
+    }
+
+    private function validateImmutableCompany(Ticket $ticket, array $ticketData): void
+    {
+        if ((int) $ticketData['companyId'] !== (int) $ticket->company_id) {
+            throw ValidationException::withMessages(['companyId' => 'Ticket company cannot be changed.']);
         }
-        $ticket->update([
-            'company_id' => $ticketData['companyId'],
-            'status' => TicketStatus::from($ticketData['status'])->value,
+    }
+
+    private function updatedAttributes(array $ticketData): array
+    {
+        $status = TicketStatus::from($ticketData['status']);
+        $closedAt = $ticketData['closedAt'] ?? ($status === TicketStatus::DONE ? now() : null);
+
+        return [
+            'status' => $status->value,
             'importance' => TicketImportanceStatus::from($ticketData['importance'])->value,
             'description' => $ticketData['description'],
             'customer_id' => $ticketData['customerId'],
-            'branch_id' => $ticketData['branchId'],
-            //'closed_at' => TicketStatus::from($ticketData['status'])->value == 1? now():null,
-            'closed_at' => $closedAt,// $ticketData['closedAt']??null,
-            'tag_id' => $ticketData['tagId']??null,
-            'real_closed_at' => TicketStatus::from($ticketData['status'])->value == 1 ? now():null
-        ]);
-
-        return $ticket;
-
-
+            'branch_id' => $ticketData['branchId'] ?? null,
+            'closed_at' => $closedAt,
+            'tag_id' => $ticketData['tagId'] ?? null,
+            'real_closed_at' => $status === TicketStatus::DONE ? now() : null,
+        ];
     }
-
-
-    public function deleteTicket(int $ticketId)
-    {
-
-        return Ticket::find($ticketId)->delete();
-
-    }
-
-
 }
