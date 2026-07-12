@@ -12,6 +12,8 @@
 
 The Team form follows those rules. Tenant callers do not receive a company selector. Branchless companies do not receive a branch selector. Changing a role clears only an incompatible branch selection; it does not reset the other account fields.
 
+New Team accounts use the existing one-time invitation flow. The create request sends `invite=true`, stores a random unusable password, forces the account inactive, hashes the expiring invitation secret, and queues the setup email only after the account transaction completes. The API response never returns the raw token, password, or hash. Direct password creation remains available to compatible API callers only when `invite` is false and a strong password and status are supplied. Pending invitations appear in the Team table with a resend action. Resend and revoke resolve the invited user through `TenantContext`, so tenant administrators cannot address another company's invitation.
+
 ## Employee application surface
 
 The seeded `employee` role has `create_ticket` and `all_tickets`. Ticket scope still applies before filters, so the employee sees only tickets they opened. The visible application routes are:
@@ -24,7 +26,7 @@ The seeded `employee` role has `create_ticket` and `all_tickets`. Ticket scope s
 
 ## Local verification
 
-- Backend suite: 97 tests and 449 assertions pass.
+- Backend suite: 101 tests and 483 assertions pass.
 - Frontend suite: 9 tests pass; lint and the production build pass.
 - Internal post-onboarding creation, immutable company ownership, cross-company branch rejection, employee ticket scope, and reporting denial are covered by feature tests.
 - Targeted Pint, both repository diff checks, and the 250-line frontend file gate pass.

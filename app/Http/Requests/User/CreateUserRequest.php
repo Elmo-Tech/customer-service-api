@@ -6,6 +6,7 @@ use App\Enums\User\UserStatus;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Rules\Password;
 
@@ -32,12 +33,11 @@ class CreateUserRequest extends FormRequest
             'email' => ['required', 'unique:users,email'],
             'phone' => '',
             'address' => '',
-            'status' => ['required', new Enum(UserStatus::class)],
+            'status' => [Rule::requiredIf(! $this->boolean('invite')), 'nullable', new Enum(UserStatus::class)],
+            'invite' => ['sometimes', 'boolean'],
             'password' => [
-                'required', 'string',
+                Rule::requiredIf(! $this->boolean('invite')), 'nullable', 'string',
                 Password::min(8)->mixedCase()->numbers()->symbols()->uncompromised(),
-                /*'min:8',
-                'regex:/^.*(?=.{1,})(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[\d\x]).*$/'*/
             ],
             'roleId' => ['required', 'numeric', 'exists:roles,id'],
             'companyId' => ['nullable', 'integer'],

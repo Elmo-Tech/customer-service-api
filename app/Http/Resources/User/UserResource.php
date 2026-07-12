@@ -31,6 +31,8 @@ class UserResource extends JsonResource
             'branchName' => $this->branch?->name,
             'roleId' => $this->roles->first()?->id,
             'roleName' => $this->roles->first()?->name,
+            'pendingInvitationId' => $this->pendingInvitation?->id,
+            'invitationExpiresAt' => $this->pendingInvitation?->expires_at?->toIso8601String(),
         ];
     }
 }

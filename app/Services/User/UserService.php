@@ -33,7 +33,7 @@ class UserService
     public function allUsers(User $caller)
     {
         $users = (new TenantContext($caller))->scopeUsers(
-            User::query()->with(['company', 'branch', 'roles']),
+            User::query()->with(['company', 'branch', 'roles', 'pendingInvitation']),
         );
 
         return QueryBuilder::for($users)->allowedFilters([
@@ -48,12 +48,15 @@ class UserService
         $context = $this->managementContext($caller);
         $role = $this->roleValidator->role($caller, (int) $userFields['roleId']);
         $tenantFields = $this->newAccountTenantFields($caller, $context, $role, $userFields);
+        $this->assertInvitationAllowed($tenantFields, (bool) ($userFields['invite'] ?? false));
         $user = User::create([
             ...$this->profileAttributes($userFields),
             ...$tenantFields,
             'avatar' => $this->avatarPath($userFields),
-            'password' => $userFields['password'],
-            'status' => UserStatus::from($userFields['status'])->value,
+            'password' => $userFields['password'] ?? bin2hex(random_bytes(32)),
+            'status' => ($userFields['invite'] ?? false)
+                ? UserStatus::INACTIVE->value
+                : UserStatus::from($userFields['status'])->value,
         ]);
         $user->assignRole($role);
 
@@ -63,7 +66,7 @@ class UserService
     public function editUser(User $caller, int $userId): User
     {
         return (new TenantContext($caller))->scopeUsers(User::query())
-            ->with(['company', 'branch', 'roles'])->findOrFail($userId);
+            ->with(['company', 'branch', 'roles', 'pendingInvitation'])->findOrFail($userId);
     }
 
     public function updateUser(User $caller, array $userFields): User
@@ -232,6 +235,13 @@ class UserService
     {
         if ($companyId !== null && $companyId !== $user->company_id) {
             throw ValidationException::withMessages(['companyId' => 'The account company cannot be changed.']);
+        }
+    }
+
+    private function assertInvitationAllowed(array $tenantFields, bool $invited): void
+    {
+        if ($invited && $tenantFields['account_type'] !== AccountType::TENANT) {
+            throw ValidationException::withMessages(['invite' => 'Invitations are only available for tenant accounts.']);
         }
     }
 

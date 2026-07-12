@@ -32,6 +32,8 @@ class AllUserDataResource extends JsonResource
             'companyName' => $this->company?->name,
             'branchId' => $this->branch_id,
             'branchName' => $this->branch?->name,
+            'pendingInvitationId' => $this->pendingInvitation?->id,
+            'invitationExpiresAt' => $this->pendingInvitation?->expires_at?->toIso8601String(),
         ];
     }
 }

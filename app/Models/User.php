@@ -12,6 +12,7 @@ use App\Models\Tiket\Ticket;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -107,5 +108,12 @@ class User extends Authenticatable implements JWTSubject
     public function accountInvitations(): HasMany
     {
         return $this->hasMany(AccountInvitation::class);
+    }
+
+    public function pendingInvitation(): HasOne
+    {
+        return $this->hasOne(AccountInvitation::class)
+            ->whereNull('consumed_at')->whereNull('revoked_at')->where('expires_at', '>', now())
+            ->latestOfMany();
     }
 }

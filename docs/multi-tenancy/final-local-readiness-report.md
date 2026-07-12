@@ -20,13 +20,13 @@ The multi-tenant implementation is complete against local SQLite fixtures. It is
 
 All authenticated endpoints use the existing JWT authentication middleware, which now rechecks active user, company, and assigned branch state on every authenticated request. Permissions determine actions. `TenantContext`, authorized resource services, parent-ticket attachment checks, or internal-only middleware determine rows and administration scope.
 
-Route review covers 51 API routes. Admin company, branch, customer, user, role, ticket, attachment, log, selector, export, dashboard, onboarding, resend, and revoke routes require authentication and their documented permissions. Public login, refresh, invitation setup, ticket review, review attachment, review submission, and PIN ticket submission are purpose-limited and rate limited where applicable.
+Route review covers 50 API routes. Admin company, branch, customer, user, role, ticket, attachment, log, selector, export, dashboard, onboarding, resend, and revoke routes require authentication and their documented permissions. Public login, refresh, invitation setup, ticket review, review attachment, and review submission are purpose-limited and rate limited where applicable. Public PIN ticket submission remains disabled.
 
-Onboarding and invitation tests cover branch-enabled and branchless success, transaction rollback, duplicate identity, platform-role denial, tenant and permission denial, expiry, replay, revocation, resend predecessor revocation, inactive company, inactive branch, response/audit redaction, and queued after-commit mail. Resource export tests cover tenant scope, permission denial, formula neutralization, and cross-tenant exclusion.
+Onboarding and invitation tests cover branch-enabled and branchless success, transaction rollback, duplicate identity, platform-role denial, tenant and permission denial, expiry, replay, revocation, resend predecessor revocation, cross-tenant resend denial, Team creation, inactive company, inactive branch, response/audit redaction, and queued after-commit mail. Resource export tests cover tenant scope, permission denial, formula neutralization, and cross-tenant exclusion.
 
 ## Compatibility and data preservation
 
-The two final migrations only create `account_invitations` and `tenant_audit_events`. Existing company, branch, customer, ticket, attachment, log, user, role, permission, email, filter, review, and export data is not rewritten or deleted. Existing individual creation/update endpoints remain available. New resource exports are additive endpoints. The frontend onboarding, companies/branches, team, setup-password, reporting, and employee routes use the existing architecture.
+The latest additive migration creates only the `legacy_ticket_imports` ledger. Existing company, branch, customer, ticket, attachment, log, user, role, permission, email, filter, review, and export data is not rewritten or deleted by migration. Legacy ticket execution is a separate explicit command guarded by mapping, dry-run, `--execute`, and `--confirm`. The frontend onboarding, companies/branches, team, setup-password, reporting, and employee routes use the existing architecture.
 
 Intentionally deferred contractions:
 
@@ -39,4 +39,4 @@ Intentionally deferred contractions:
 
 ## Unresolved local limitations
 
-No HTTPS browser session was available for end-to-end cookie, refresh, review, wizard, download, and responsive visual verification. SQLite cannot prove MySQL DDL, locking, collation, or query-plan behavior. Queue transport failure/retry was covered by persistent invitation design and Mail fakes, not a real worker/SMTP staging exercise. These remain production gates.
+No HTTPS browser session was available for end-to-end cookie, refresh, review, wizard, download, and responsive visual verification. SQLite cannot prove MySQL DDL, locking, collation, query-plan behavior, or the connected legacy import. Queue transport failure/retry was covered by persistent invitation design and Mail fakes, not a real worker/SMTP staging exercise. These remain production gates.

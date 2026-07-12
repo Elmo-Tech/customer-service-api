@@ -33,6 +33,8 @@ Production is not approved until every required item below has evidence attached
 - [ ] Complete the browser checklist in `frontend-session-and-reporting.md`.
 - [ ] Verify onboarding step validation, back/forward state preservation, hidden branch stripping, review, success recovery, and field-level server errors.
 - [ ] Verify company, branch, team, employee submission, dashboard, export, setup-password, and public review pages across supported viewport sizes.
+- [ ] Run `tickets:audit-legacy`, complete the authoritative mapping, and obtain a clean `tickets:import-legacy` dry-run before any legacy execution.
+- [ ] Freeze or snapshot the legacy source, copy attachment files, rehearse target restore, then run `tickets:import-legacy ... --execute --confirm` once and reconcile counts.
 - [ ] Confirm `npm audit --omit=dev` remains clean and the production bundle matches the reviewed artifact.
 - [ ] Keep the Vite development server private until the separately approved breaking upgrade resolves its development-only advisories.
 

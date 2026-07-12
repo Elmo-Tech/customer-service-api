@@ -8,11 +8,15 @@ use App\Enums\Company\CustomerStatus;
 use App\Enums\User\AccountType;
 use App\Enums\User\TenantRole;
 use App\Enums\User\UserStatus;
+use App\Mail\AccountInvitationMail;
+use App\Models\Auth\AccountInvitation;
 use App\Models\Company\Branch;
 use App\Models\Company\Company;
 use App\Models\Company\Customer;
 use App\Models\User;
+use App\Services\Auth\AccountInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -212,6 +216,35 @@ class ResourceEndpointIsolationTest extends TestCase
         ]);
     }
 
+    public function test_team_creation_queues_one_time_invitation_without_accepting_a_password(): void
+    {
+        Mail::fake();
+        $employeeRole = Role::where('name', TenantRole::EMPLOYEE->value)->firstOrFail();
+        $payload = $this->newUserPayload('invited-team-member', $employeeRole);
+        unset($payload['password'], $payload['status']);
+
+        $response = $this->actingAs($this->owner, 'api')->postJson('/api/v1/admin/users/create', [
+            ...$payload,
+            'invite' => true,
+        ])->assertOk()->assertJsonPath('invitationQueued', true);
+
+        $user = User::where('username', 'invited-team-member')->firstOrFail();
+        $this->assertSame(UserStatus::INACTIVE, $user->status);
+        $this->assertSame(1, AccountInvitation::where('user_id', $user->id)->count());
+        $this->assertStringNotContainsString('token', $response->getContent());
+        $this->assertStringNotContainsString('password', $response->getContent());
+        $invitation = AccountInvitation::where('user_id', $user->id)->firstOrFail();
+        $this->actingAs($this->owner, 'api')
+            ->postJson("/api/v1/admin/account-invitations/{$invitation->id}/resend")
+            ->assertOk()->assertJsonMissingPath('token');
+        $this->assertSame(2, AccountInvitation::where('user_id', $user->id)->count());
+        $latestInvitation = AccountInvitation::where('user_id', $user->id)->latest('id')->firstOrFail();
+        $teamRow = collect($this->actingAs($this->owner, 'api')->getJson('/api/v1/admin/users')
+            ->assertOk()->json('result.users'))->firstWhere('userId', $user->id);
+        $this->assertSame($latestInvitation->id, $teamRow['pendingInvitationId']);
+        Mail::assertQueued(AccountInvitationMail::class, 2);
+    }
+
     public function test_internal_admin_cannot_move_existing_account_to_another_company(): void
     {
         $internal = User::findOrFail(1);
@@ -227,6 +260,22 @@ class ResourceEndpointIsolationTest extends TestCase
         ])->assertUnprocessable();
 
         $this->assertSame($this->otherCompany->id, $this->otherTenantUser->fresh()->company_id);
+    }
+
+    public function test_tenant_cannot_resend_another_company_invitation(): void
+    {
+        $otherUser = $this->tenantUser(
+            'other-invited-user', TenantRole::EMPLOYEE, $this->otherCompany, $this->otherCompanyBranch,
+        );
+        $otherUser->update(['status' => UserStatus::INACTIVE->value]);
+        $secret = app(AccountInvitationService::class)->issue($otherUser, User::findOrFail(1));
+
+        $this->actingAs($this->owner, 'api')
+            ->postJson("/api/v1/admin/account-invitations/{$secret->invitationId}/resend")
+            ->assertNotFound();
+        $this->assertDatabaseHas('account_invitations', [
+            'id' => $secret->invitationId, 'revoked_at' => null,
+        ]);
     }
 
     public function test_internal_admin_cannot_assign_branch_from_another_company(): void

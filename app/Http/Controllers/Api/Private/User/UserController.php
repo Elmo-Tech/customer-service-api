@@ -9,6 +9,7 @@ use App\Http\Resources\User\AllUserCollection;
 use App\Http\Resources\User\AllUserDataResource;
 use App\Models\User;
 use App\Services\Export\ResourceCsvExporter;
+use App\Services\User\TeamMemberCreationService;
 use App\Services\User\UserService;
 use App\Utils\PaginateCollection;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class UserController extends Controller
     public function __construct(
         private readonly UserService $userService,
         private readonly ResourceCsvExporter $csv,
+        private readonly TeamMemberCreationService $teamMembers,
     ) {
         $this->middleware('auth:api');
         $this->middleware('permission:all_users')->only('allUsers');
@@ -54,9 +56,12 @@ class UserController extends Controller
 
     public function create(CreateUserRequest $request): JsonResponse
     {
-        DB::transaction(fn () => $this->userService->createUser($request->user(), $request->validated()));
+        $invited = $this->teamMembers->create($request->user(), $request->validated());
 
-        return response()->json(['message' => 'تم اضافة مستخدم جديد بنجاح']);
+        return response()->json([
+            'message' => $invited ? 'Invitation queued.' : 'تم اضافة مستخدم جديد بنجاح',
+            'invitationQueued' => $invited,
+        ]);
     }
 
     public function edit(Request $request): JsonResponse
