@@ -65,7 +65,7 @@ Rollback the application release without reverting populated attachment metadata
 
 ## Reporting rollout gate
 
-- [ ] Explicitly map canonical `export_tickets` and `view_ticket_dashboard`; preserve `all_tickets` compatibility during rollout.
+- [ ] Explicitly map canonical `export_tickets` and `view_ticket_dashboard`; verify `all_tickets` alone cannot access reporting.
 - [ ] Compare list, export, and dashboard totals with identical filters for internal, company, branch, and employee fixtures.
 - [ ] Confirm CSV filename, formula neutralization, hidden-field exclusions, and bounded query behavior.
 - [ ] Confirm branchless dashboards return an empty branch series.

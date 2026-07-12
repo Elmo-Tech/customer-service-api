@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
 
-
 class UserResource extends JsonResource
 {
     /**
@@ -18,12 +17,20 @@ class UserResource extends JsonResource
     {
         return [
             'userId' => $this->id,
-            'name' => $this->name?$this->name:"",
-            'phone' => $this->phone?$this->phone:"",
-            'email' => $this->email??"",
-            'address' => $this->address?$this->address:"",
+            'name' => $this->name ?? '',
+            'username' => $this->username ?? '',
+            'phone' => $this->phone ?? '',
+            'email' => $this->email ?? '',
+            'address' => $this->address ?? '',
             'status' => $this->status,
-            'avatar' => $this->avatar?Storage::disk('public')->url($this->avatar):"",
+            'avatar' => $this->avatar ? Storage::disk('public')->url($this->avatar) : '',
+            'accountType' => $this->account_type?->value,
+            'companyId' => $this->company_id,
+            'companyName' => $this->company?->name,
+            'branchId' => $this->branch_id,
+            'branchName' => $this->branch?->name,
+            'roleId' => $this->roles->first()?->id,
+            'roleName' => $this->roles->first()?->name,
         ];
     }
 }

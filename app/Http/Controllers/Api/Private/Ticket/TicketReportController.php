@@ -16,8 +16,8 @@ class TicketReportController extends Controller
         private readonly TicketDashboardService $dashboardService,
     ) {
         $this->middleware('auth:api');
-        $this->middleware('permission:export_tickets|all_tickets')->only('export');
-        $this->middleware('permission:view_ticket_dashboard|all_tickets')->only('dashboard');
+        $this->middleware('permission:export_tickets')->only('export');
+        $this->middleware('permission:view_ticket_dashboard')->only('dashboard');
     }
 
     public function export(FilterTicketsRequest $request): StreamedResponse

@@ -80,8 +80,12 @@ class SelectService
         return $this->tenantContext($user)
             ->scopeCompanies(Company::query())
             ->where('status', CompanyStatus::ACTIVE->value)
-            ->select(['id as value', 'name as label'])
-            ->get()->all();
+            ->get(['id', 'name', 'uses_branches'])
+            ->map(fn (Company $company) => [
+                'value' => $company->id,
+                'label' => $company->name,
+                'usesBranches' => $company->uses_branches,
+            ])->all();
     }
 
     private function branches(User $user, ?string $companyId): array

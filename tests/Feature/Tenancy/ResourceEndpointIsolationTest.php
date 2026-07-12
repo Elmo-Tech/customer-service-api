@@ -72,6 +72,10 @@ class ResourceEndpointIsolationTest extends TestCase
             $this->otherTenantUser->id,
             collect($users->json('result.users'))->pluck('userId')->all(),
         );
+        $ownerRow = collect($users->json('result.users'))->firstWhere('userId', $this->owner->id);
+        $this->assertSame(TenantRole::COMPANY_OWNER->value, $ownerRow['roleName']);
+        $this->assertSame($this->tenantCompany->name, $ownerRow['companyName']);
+        $this->assertSame($this->tenantBranch->name, $ownerRow['branchName']);
     }
 
     public function test_cross_tenant_company_customer_branch_and_user_ids_fail_closed(): void
@@ -186,6 +190,58 @@ class ResourceEndpointIsolationTest extends TestCase
         $this->actingAs($manager, 'api')
             ->postJson('/api/v1/admin/users/create', $this->newUserPayload('manager-attempt', $companyManagerRole))
             ->assertForbidden();
+    }
+
+    public function test_internal_admin_can_add_tenant_team_member_after_onboarding(): void
+    {
+        $internal = User::findOrFail(1);
+        $internal->givePermissionTo('create_user');
+        $employeeRole = Role::where('name', TenantRole::EMPLOYEE->value)->firstOrFail();
+
+        $this->actingAs($internal, 'api')->postJson('/api/v1/admin/users/create', [
+            ...$this->newUserPayload('later-team-member', $employeeRole),
+            'companyId' => $this->otherCompany->id,
+            'branchId' => $this->otherCompanyBranch->id,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'username' => 'later-team-member',
+            'account_type' => AccountType::TENANT->value,
+            'company_id' => $this->otherCompany->id,
+            'branch_id' => $this->otherCompanyBranch->id,
+        ]);
+    }
+
+    public function test_internal_admin_cannot_move_existing_account_to_another_company(): void
+    {
+        $internal = User::findOrFail(1);
+        $internal->givePermissionTo('update_user');
+        $employeeRole = Role::where('name', TenantRole::EMPLOYEE->value)->firstOrFail();
+
+        $this->actingAs($internal, 'api')->putJson('/api/v1/admin/users/update', [
+            ...$this->newUserPayload($this->otherTenantUser->username, $employeeRole),
+            'userId' => $this->otherTenantUser->id,
+            'email' => $this->otherTenantUser->email,
+            'companyId' => $this->tenantCompany->id,
+            'branchId' => $this->tenantBranch->id,
+        ])->assertUnprocessable();
+
+        $this->assertSame($this->otherCompany->id, $this->otherTenantUser->fresh()->company_id);
+    }
+
+    public function test_internal_admin_cannot_assign_branch_from_another_company(): void
+    {
+        $internal = User::findOrFail(1);
+        $internal->givePermissionTo('create_user');
+        $employeeRole = Role::where('name', TenantRole::EMPLOYEE->value)->firstOrFail();
+
+        $this->actingAs($internal, 'api')->postJson('/api/v1/admin/users/create', [
+            ...$this->newUserPayload('cross-company-branch', $employeeRole),
+            'companyId' => $this->otherCompany->id,
+            'branchId' => $this->tenantBranch->id,
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseMissing('users', ['username' => 'cross-company-branch']);
     }
 
     public function test_employee_cannot_administer_resources_even_with_injected_permissions(): void

@@ -32,7 +32,7 @@ The following streamed CSV routes use their existing authorized list query and f
 - `GET /api/v1/admin/users/export`: `export_users` or `all_users`
 - `GET /api/v1/admin/customers/export`: `export_customers` or `all_customers`
 - `GET /api/v1/admin/companies/export`: `export_companies` or `all_companies`
-- `GET /api/v1/admin/tickets/export`: `export_tickets` or `all_tickets`
+- `GET /api/v1/admin/tickets/export`: `export_tickets`
 
 Every text cell beginning with optional whitespace followed by `=`, `+`, `-`, or `@` receives an apostrophe prefix. Hidden IDs, passwords, PINs, tokens, hashes, and soft-deleted rows are not exported. Frontend `xlsx` and `file-saver` dependencies and client-side workbook generation were removed.
 

@@ -2,12 +2,15 @@
 
 namespace App\Services\User;
 
+use App\Enums\Company\BranchStatus;
+use App\Enums\Company\CompanyStatus;
 use App\Enums\User\AccountType;
 use App\Enums\User\TenantRole;
 use App\Enums\User\UserStatus;
 use App\Filters\User\FilterUser;
 use App\Filters\User\FilterUserRole;
 use App\Models\Company\Branch;
+use App\Models\Company\Company;
 use App\Models\User;
 use App\Services\Auth\RefreshSessionService;
 use App\Services\Tenancy\TenantContext;
@@ -29,7 +32,9 @@ class UserService
 
     public function allUsers(User $caller)
     {
-        $users = (new TenantContext($caller))->scopeUsers(User::query());
+        $users = (new TenantContext($caller))->scopeUsers(
+            User::query()->with(['company', 'branch', 'roles']),
+        );
 
         return QueryBuilder::for($users)->allowedFilters([
             AllowedFilter::custom('search', new FilterUser),
@@ -58,7 +63,7 @@ class UserService
     public function editUser(User $caller, int $userId): User
     {
         return (new TenantContext($caller))->scopeUsers(User::query())
-            ->with('roles')->findOrFail($userId);
+            ->with(['company', 'branch', 'roles'])->findOrFail($userId);
     }
 
     public function updateUser(User $caller, array $userFields): User
@@ -66,6 +71,8 @@ class UserService
         $context = $this->managementContext($caller);
         $user = $context->scopeUsers(User::query())->findOrFail($userFields['userId']);
         $role = $this->roleValidator->role($caller, (int) $userFields['roleId']);
+        $this->assertRoleMatchesAccountType($user, $role);
+        $this->assertCompanyIsImmutable($user, $userFields['companyId'] ?? null);
         $user->fill($this->profileAttributes($userFields));
         $user->status = UserStatus::from($userFields['status'])->value;
         $user->branch_id = $this->updatedBranchId($caller, $user, $role, $userFields);
@@ -125,35 +132,53 @@ class UserService
         array $userFields
     ): array {
         if ($context->isInternal()) {
-            return ['account_type' => AccountType::INTERNAL, 'company_id' => null, 'branch_id' => null];
+            if (! $this->isTenantRole($role)) {
+                return ['account_type' => AccountType::INTERNAL, 'company_id' => null, 'branch_id' => null];
+            }
+
+            return $this->tenantAccountFields(
+                $caller,
+                $this->activeCompany($userFields['companyId'] ?? null),
+                $role,
+                $userFields,
+            );
         }
 
-        return [
-            'account_type' => AccountType::TENANT,
-            'company_id' => $context->tenantCompanyId(),
-            'branch_id' => $this->authorizedBranchId($caller, $role, $userFields['branchId'] ?? null),
-        ];
+        return $this->tenantAccountFields($caller, $caller->company, $role, $userFields);
     }
 
     private function updatedBranchId(User $caller, User $user, Role $role, array $userFields): ?int
     {
-        if ((new TenantContext($caller))->isInternal()) {
-            return $user->branch_id;
+        if ($user->account_type === AccountType::INTERNAL) {
+            return null;
         }
 
-        return $this->authorizedBranchId($caller, $role, $userFields['branchId'] ?? $user->branch_id);
+        return $this->authorizedBranchId(
+            $caller,
+            $user->company,
+            $role,
+            $userFields['branchId'] ?? $user->branch_id,
+        );
     }
 
-    private function authorizedBranchId(User $caller, Role $role, ?int $requestedBranchId): ?int
+    private function tenantAccountFields(User $caller, Company $company, Role $role, array $userFields): array
     {
-        $context = new TenantContext($caller);
+        return [
+            'account_type' => AccountType::TENANT,
+            'company_id' => $company->id,
+            'branch_id' => $this->authorizedBranchId($caller, $company, $role, $userFields['branchId'] ?? null),
+        ];
+    }
+
+    private function authorizedBranchId(User $caller, Company $company, Role $role, ?int $requestedBranchId): ?int
+    {
         $branchId = $caller->hasRole(TenantRole::BRANCH_MANAGER->value)
-            ? $context->tenantBranchId()
+            ? (new TenantContext($caller))->tenantBranchId()
             : $requestedBranchId;
-        if (! $caller->company->uses_branches && $branchId !== null) {
+        if (! $company->uses_branches && $branchId !== null) {
             throw ValidationException::withMessages(['branchId' => 'This company does not use branches.']);
         }
-        $branchRequired = $caller->company->uses_branches && in_array($role->name, [
+        $branchRequired = $company->uses_branches && in_array($role->name, [
             TenantRole::BRANCH_MANAGER->value,
             TenantRole::EMPLOYEE->value,
         ], true);
@@ -162,23 +187,57 @@ class UserService
             throw ValidationException::withMessages(['branchId' => 'A branch is required for this role.']);
         }
 
-        return $this->validatedBranchId($context, $branchId);
+        return $this->validatedBranchId($company->id, $branchId);
     }
 
-    private function validatedBranchId(TenantContext $context, ?int $branchId): ?int
+    private function validatedBranchId(int $companyId, ?int $branchId): ?int
     {
         if ($branchId === null) {
             return null;
         }
 
         $validBranch = Branch::query()->whereKey($branchId)
-            ->where('company_id', $context->tenantCompanyId())->where('status', 1)->exists();
+            ->where('company_id', $companyId)->where('status', BranchStatus::ACTIVE->value)->exists();
 
         if (! $validBranch) {
             throw ValidationException::withMessages(['branchId' => 'Branch is outside the authorized company.']);
         }
 
         return $branchId;
+    }
+
+    private function activeCompany(?int $companyId): Company
+    {
+        if ($companyId === null) {
+            throw ValidationException::withMessages(['companyId' => 'A company is required for tenant roles.']);
+        }
+
+        $company = Company::query()->whereKey($companyId)
+            ->where('status', CompanyStatus::ACTIVE->value)->first();
+        if (! $company) {
+            throw ValidationException::withMessages(['companyId' => 'The selected company is inactive or missing.']);
+        }
+
+        return $company;
+    }
+
+    private function assertRoleMatchesAccountType(User $user, Role $role): void
+    {
+        if (($user->account_type === AccountType::TENANT) !== $this->isTenantRole($role)) {
+            throw ValidationException::withMessages(['roleId' => 'The role cannot change the account type.']);
+        }
+    }
+
+    private function assertCompanyIsImmutable(User $user, ?int $companyId): void
+    {
+        if ($companyId !== null && $companyId !== $user->company_id) {
+            throw ValidationException::withMessages(['companyId' => 'The account company cannot be changed.']);
+        }
+    }
+
+    private function isTenantRole(Role $role): bool
+    {
+        return in_array($role->name, array_column(TenantRole::cases(), 'value'), true);
     }
 
     private function profileAttributes(array $userFields): array

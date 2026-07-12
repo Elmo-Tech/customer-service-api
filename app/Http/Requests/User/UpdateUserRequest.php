@@ -38,6 +38,7 @@ class UpdateUserRequest extends FormRequest
                 Password::min(8)->mixedCase()->numbers()->symbols()->uncompromised(),
             ],
             'roleId' => 'required',
+            'companyId' => ['nullable', 'integer'],
             'branchId' => ['nullable', 'integer'],
             'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,jpg,png,gif', 'max:2048'],
         ];

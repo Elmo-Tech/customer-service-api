@@ -51,7 +51,7 @@ class TicketReportingIsolationTest extends TestCase
         $this->otherCustomer = $this->customer($this->otherCompany, 'Customer B');
     }
 
-    public function test_dashboard_totals_equal_authorized_list_for_every_account_scope(): void
+    public function test_dashboard_matches_authorized_lists_while_employee_reporting_stays_blocked(): void
     {
         $owner = $this->tenantUser('owner', TenantRole::COMPANY_OWNER, $this->company, $this->branch);
         $branchManager = $this->tenantUser('branch-manager', TenantRole::BRANCH_MANAGER, $this->company, $this->branch);
@@ -63,34 +63,35 @@ class TicketReportingIsolationTest extends TestCase
             $this->otherCompany,
             $this->otherBranch,
         );
-        $employeeTicket = $this->ticket($this->company, $this->branch, $this->customer, [
+        $this->ticket($this->company, $this->branch, $this->customer, [
             'opened_by_user_id' => $employee->id,
         ]);
-        $otherEmployeeTicket = $this->ticket($this->company, $this->branch, $this->customer, [
+        $this->ticket($this->company, $this->branch, $this->customer, [
             'opened_by_user_id' => $otherEmployee->id,
         ]);
         $this->ticket($this->otherCompany, $this->otherBranch, $this->otherCustomer, [
             'opened_by_user_id' => $otherTenantEmployee->id,
         ]);
 
-        foreach ([$this->internal, $owner, $branchManager, $employee] as $user) {
-            $user->givePermissionTo('all_tickets');
+        foreach ([$this->internal, $owner, $branchManager] as $user) {
+            $user->givePermissionTo(['all_tickets', 'export_tickets', 'view_ticket_dashboard']);
             $listCount = $this->listCount($user);
             $dashboardTotal = $this->dashboard($user)->json('data.kpis.total');
             $this->assertSame($listCount, $dashboardTotal);
         }
 
-        $employeeCsv = $this->export($employee)->streamedContent();
-        $this->assertStringContainsString($employeeTicket->ticket_number, $employeeCsv);
-        $this->assertStringNotContainsString($otherEmployeeTicket->ticket_number, $employeeCsv);
+        $employee->givePermissionTo('all_tickets');
+        $this->assertSame(1, $this->listCount($employee));
+        $this->actingAs($employee, 'api')->getJson('/api/v1/admin/tickets/dashboard')->assertForbidden();
+        $this->actingAs($employee, 'api')->get('/api/v1/admin/tickets/export')->assertForbidden();
     }
 
     public function test_altered_company_and_branch_filters_never_widen_dashboard_or_export(): void
     {
         $owner = $this->tenantUser('filter-owner', TenantRole::COMPANY_OWNER, $this->company, $this->branch);
         $manager = $this->tenantUser('filter-manager', TenantRole::BRANCH_MANAGER, $this->company, $this->branch);
-        $owner->givePermissionTo('all_tickets');
-        $manager->givePermissionTo('all_tickets');
+        $owner->givePermissionTo(['all_tickets', 'export_tickets', 'view_ticket_dashboard']);
+        $manager->givePermissionTo(['all_tickets', 'export_tickets', 'view_ticket_dashboard']);
         $tenantTicket = $this->ticket($this->company, $this->branch, $this->customer);
         $otherTicket = $this->ticket($this->otherCompany, $this->otherBranch, $this->otherCustomer);
 
@@ -166,7 +167,7 @@ class TicketReportingIsolationTest extends TestCase
         $company = $this->company('Branchless', false);
         $customer = $this->customer($company, 'Branchless Customer');
         $owner = $this->tenantUser('branchless-owner', TenantRole::COMPANY_OWNER, $company, null);
-        $owner->givePermissionTo('all_tickets');
+        $owner->givePermissionTo(['all_tickets', 'view_ticket_dashboard']);
         $this->ticket($company, null, $customer, ['opened_by_user_id' => $owner->id]);
 
         $this->dashboard($owner)->assertJsonPath('data.kpis.total', 1)

@@ -25,7 +25,7 @@ Unknown filters and invalid enum, ID, or date values return `422`. Missing authe
 
 `GET /api/v1/admin/tickets/export`
 
-Required permission: canonical `export_tickets` or legacy-compatible `all_tickets`. The response is a streamed UTF-8 CSV attachment named `tickets-YYYY-MM-DD.csv`.
+Required permission: canonical `export_tickets`. The response is a streamed UTF-8 CSV attachment named `tickets-YYYY-MM-DD.csv`.
 
 Columns are limited to Ticket Number, Customer, Company, Branch, Status, Importance, Description, Created At, and Closed At. Internal IDs, tenant foreign keys, PINs, review tokens, attachment paths, user identity fields, and soft-deleted tickets are not exported. Rows are iterated in bounded chunks with customer, company, and branch eager loading.
 
@@ -35,7 +35,7 @@ HTML is stripped from descriptions. A text cell whose first non-space character 
 
 `GET /api/v1/admin/tickets/dashboard`
 
-Required permission: canonical `view_ticket_dashboard` or legacy-compatible `all_tickets`. The stable response envelope is:
+Required permission: canonical `view_ticket_dashboard`. The stable response envelope is:
 
 ```json
 {
@@ -71,6 +71,6 @@ No overdue KPI is returned because the ticket model has no due date or service-l
 
 ## Deployment and rollback
 
-This phase adds routes and seed catalog entries but no database migration. Before enabling the new frontend, add and assign canonical `export_tickets` and `view_ticket_dashboard` permissions through the approved role-mapping process. Existing users with `all_tickets` retain compatibility during rollout. Do not infer new grants from role names.
+This phase adds routes and seed catalog entries but no database migration. Before enabling the reporting frontend, add and assign canonical `export_tickets` and `view_ticket_dashboard` permissions through the approved role-mapping process. `all_tickets` no longer grants reporting access. Do not infer new grants from role names.
 
 Rollback is application-only: stop using the two new routes and continue using the unchanged ticket list. Leaving canonical permission records in place avoids destructive cleanup. Compare dashboard totals and export row counts with the identically filtered list before promotion.

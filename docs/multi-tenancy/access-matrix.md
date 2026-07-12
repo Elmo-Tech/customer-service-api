@@ -34,7 +34,8 @@ Every allowed cell requires both the named action permission and the row scope. 
 
 ## Reporting permission compatibility
 
-- Export requires canonical `export_tickets`; legacy `all_tickets` is accepted during migration.
-- Dashboard requires canonical `view_ticket_dashboard`; legacy `all_tickets` is accepted during migration.
+- Export requires canonical `export_tickets`.
+- Dashboard requires canonical `view_ticket_dashboard`.
+- An employee with `all_tickets` and `create_ticket` can submit tickets and list only tickets they opened. It cannot access dashboard aggregates, exports, contacts, team administration, companies, branches, or roles without separately assigned canonical permissions and authority.
 - Canonical assignments must be explicit. Role names never imply a grant.
 - Action checks remain independent from `AuthorizedTicketQuery` row scope.

@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources\User;
 
-use App\Http\Resources\Role\RoleResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -17,8 +16,6 @@ class AllUserDataResource extends JsonResource
     public function toArray(Request $request): array
     {
 
-        // dd($userData);
-
         return [
             'userId' => $this->id,
             'name' => $this->name ?? '',
@@ -28,10 +25,13 @@ class AllUserDataResource extends JsonResource
             'address' => $this->address ?? '',
             'status' => $this->status,
             'avatar' => $this->avatar ? Storage::disk('public')->url($this->avatar) : '',
-            'roleId' => RoleResource::collection($this->whenLoaded('roles'))[0]->id,
+            'roleId' => $this->roles->first()?->id,
+            'roleName' => $this->roles->first()?->name,
             'accountType' => $this->account_type?->value,
             'companyId' => $this->company_id,
+            'companyName' => $this->company?->name,
             'branchId' => $this->branch_id,
+            'branchName' => $this->branch?->name,
         ];
     }
 }

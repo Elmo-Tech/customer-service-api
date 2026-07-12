@@ -13,17 +13,17 @@ On application startup, `SessionBootstrap` clears the legacy `token`, `profile`,
 
 Axios attaches only the in-memory access token. Concurrent eligible `401` responses share one refresh request, each original request is retried at most once, and refresh/login/logout/public-review calls opt out of retry where required. Logout clears the in-memory session and React Query cache after the backend clears and revokes the HttpOnly refresh cookie.
 
-The frontend API base defaults to `https://customerservicebe.testingelmo.com/api/v1/` and may be set with `VITE_API_URL`. The backend cookie origin, Secure, SameSite, path, CORS, and trusted-origin requirements remain defined in `authentication-and-review-capabilities.md`.
+The frontend API base defaults to `https://tickets-sys-api.testingelmo.com/api/v1/` and may be set with `VITE_API_URL`. The backend cookie origin, Secure, SameSite, path, CORS, and trusted-origin requirements remain defined in `authentication-and-review-capabilities.md`.
 
 ## Route and capability presentation
 
 | Route | Presentation requirement |
 |---|---|
-| `/dashboard` | `view_ticket_dashboard` or compatible `all_tickets` |
+| `/dashboard` | `view_ticket_dashboard` |
 | `/dashboard/tickets` | `all_tickets` |
 | `/dashboard/submit` | tenant account; create endpoint also requires `all_tickets` |
-| `/dashboard/users` | `all_customers` |
-| `/dashboard/admins` | internal account and `all_users` |
+| `/dashboard/users` | `all_customers`; labelled Contacts because these are not login accounts |
+| `/dashboard/admins` | `all_users`; labelled Team and tenant-scoped for company accounts |
 | `/dashboard/roles` | internal account and `all_roles` |
 
 Direct disallowed navigation renders a 403 result. These checks only control presentation; altering Zustand, URLs, DOM, filters, or selectors does not grant backend access. Tenant ticket filters omit company selection. The authenticated submission page omits company, customer, PIN, and status inputs; `POST /api/v1/admin/tickets/create` derives company, assigned branch, opened-by user, and open status. Branchless tenant submission stores no synthetic branch. `/` redirects unauthenticated visitors to login and authenticated tenant users to ticket submission. Only review and invitation setup remain public-purpose pages.
