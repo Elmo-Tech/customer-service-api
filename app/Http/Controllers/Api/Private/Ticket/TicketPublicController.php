@@ -24,6 +24,7 @@ class TicketPublicController extends Controller
         ]);
         $ticket = $this->reviewQuery->ticket((int) $review['ticketId'], $review['token'], [
             'customer:id,firstname,lastname',
+            'openedBy:id,name',
             'company:id,name',
             'attachments:id,ticket_id',
         ]);

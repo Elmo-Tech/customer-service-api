@@ -37,7 +37,10 @@ class CustomerService
         $branchId = $this->authorizedBranchId($caller, $companyId, $customerFields['branchId'] ?? null);
         $this->assertUniqueName($companyId, $customerFields);
 
-        return Customer::create($this->attributes($customerFields, $companyId, $branchId));
+        return Customer::create([
+            ...$this->attributes($customerFields, $companyId, $branchId),
+            'pin' => $customerFields['pin'] ?? '',
+        ]);
     }
 
     public function editCustomer(User $caller, int $customerId): Customer
@@ -118,7 +121,6 @@ class CustomerService
         return [
             'firstname' => $fields['firstname'],
             'lastname' => $fields['lastname'],
-            'pin' => $fields['pin'],
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'status' => CustomerStatus::from($fields['status'])->value,

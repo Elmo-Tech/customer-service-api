@@ -63,24 +63,31 @@ class TicketEmailFlowTest extends TestCase
         Storage::fake('ticket_attachments');
 
         $customer = $this->makeCustomer();
+        $requester = User::create([
+            'name' => 'Tenant Requester',
+            'username' => 'tenant-requester',
+            'email' => 'requester@example.com',
+            'password' => 'Password1!',
+            'status' => 1,
+            'account_type' => AccountType::TENANT,
+            'company_id' => $customer->company_id,
+            'branch_id' => $customer->company->branches()->first()->id,
+        ]);
 
-        $this->post('/api/v1/tickets/create', [
-            'status' => TicketStatus::OPENED->value,
+        $this->actingAs($requester, 'api')->withoutMiddleware()->post('/api/v1/admin/tickets/create', [
             'importance' => TicketImportanceStatus::GREEN->value,
             'description' => 'Printer issue',
-            'customerId' => $customer->id,
-            'pin' => '1234',
-            'companyId' => $customer->company_id,
-            'branchId' => $customer->company->branches()->first()->id,
             'attachments' => [
                 UploadedFile::fake()->create('screenshot.png', 10, 'image/png'),
             ],
         ])
-            ->assertOk();
+            ->assertCreated();
 
         Mail::assertSent(TicketDetails::class, 5);
         Mail::assertSent(TicketDetails::class, fn ($mail) => $mail->hasTo('it-arca@arcagroup.eu') && count($mail->attachments()) === 1);
         $attachment = Ticket::query()->latest('id')->firstOrFail()->attachments()->firstOrFail();
+        $this->assertNull($attachment->ticket->customer_id);
+        $this->assertSame($requester->id, $attachment->ticket->opened_by_user_id);
         $this->assertSame('private', $attachment->storage_disk);
         Storage::disk('ticket_attachments')->assertExists($attachment->path);
     }

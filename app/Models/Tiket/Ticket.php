@@ -44,7 +44,8 @@ class Ticket extends Model
         parent::boot();
 
         static::creating(function ($model) {
-            $model->ticket_number = 'T'.generateUniqNumber(4).$model->customer_id.'_'.Carbon::now()->format('m/Y');
+            $requesterId = $model->customer_id ?? $model->opened_by_user_id;
+            $model->ticket_number = 'T'.generateUniqNumber(4).$requesterId.'_'.Carbon::now()->format('m/Y');
         });
     }
 
@@ -81,5 +82,15 @@ class Ticket extends Model
     public function logs()
     {
         return $this->hasMany(TicketLog::class);
+    }
+
+    public function requesterName(): string
+    {
+        return $this->customer?->getFullName() ?? $this->openedBy?->name ?? '';
+    }
+
+    public function requesterEmail(): ?string
+    {
+        return $this->customer?->email ?? $this->openedBy?->email;
     }
 }

@@ -28,7 +28,7 @@ class TicketNotificationService
             return;
         }
 
-        $ticket->loadMissing(['customer', 'company', 'attachments']);
+        $ticket->loadMissing(['customer', 'openedBy', 'company', 'attachments']);
         $mailContent = $this->mailContent($ticket);
         $this->sendInternalUpdate($mailContent);
 
@@ -56,7 +56,7 @@ class TicketNotificationService
         $importance = [0 => 'Verde', 1 => 'Giallo', 2 => 'Rosso'];
 
         return "ticket: {$ticket->ticket_number} | {$importance[$ticket->importance]} | "
-            .$ticket->customer->getFullName()." | {$ticket->company->name}";
+            .$ticket->requesterName()." | {$ticket->company->name}";
     }
 
     private function body(Ticket $ticket): string
@@ -81,15 +81,15 @@ class TicketNotificationService
         $mailContent['ticketId'] = $ticket->id;
         Mail::to('mr10dev10@gmail.com')->send(new ClosedTicketDetails($mailContent));
 
-        if ($ticket->customer->email) {
-            Mail::to($ticket->customer->email)->send(new ClosedTicketDetails($mailContent));
+        if ($ticket->requesterEmail()) {
+            Mail::to($ticket->requesterEmail())->send(new ClosedTicketDetails($mailContent));
         }
     }
 
     private function sendCustomerUpdate(Ticket $ticket, array $mailContent): void
     {
-        if ($ticket->customer->email) {
-            Mail::to($ticket->customer->email)->send(new TicketDetails($mailContent));
+        if ($ticket->requesterEmail()) {
+            Mail::to($ticket->requesterEmail())->send(new TicketDetails($mailContent));
         }
     }
 }

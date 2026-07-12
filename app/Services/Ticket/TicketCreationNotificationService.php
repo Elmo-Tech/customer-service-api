@@ -17,7 +17,7 @@ class TicketCreationNotificationService
 
     public function send(Ticket $ticket, array $attachmentPaths): void
     {
-        $ticket->loadMissing(['customer', 'company']);
+        $ticket->loadMissing(['customer', 'openedBy', 'company']);
         $mailContent = [
             'subject' => $this->subject($ticket),
             'body' => $ticket->description,
@@ -28,8 +28,8 @@ class TicketCreationNotificationService
             Mail::to($recipient)->send(new TicketDetails($mailContent));
         }
 
-        if ($ticket->customer->email) {
-            Mail::to($ticket->customer->email)->send(new TicketDetails($mailContent));
+        if ($ticket->requesterEmail()) {
+            Mail::to($ticket->requesterEmail())->send(new TicketDetails($mailContent));
         }
     }
 
@@ -38,6 +38,6 @@ class TicketCreationNotificationService
         $importance = [0 => 'Verde', 1 => 'Giallo', 2 => 'Rosso'];
 
         return "ticket: {$ticket->ticket_number} | {$importance[$ticket->importance]} | "
-            .$ticket->customer->getFullName()." | {$ticket->company->name}";
+            .$ticket->requesterName()." | {$ticket->company->name}";
     }
 }

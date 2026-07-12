@@ -32,7 +32,7 @@ Intentionally deferred contractions:
 
 - legacy public attachment copies remain until the observation and backup gate;
 - legacy plaintext ticket review-token column and compatibility verifier remain until authoritative expiry/purpose migration is possible;
-- the legacy public PIN submission route remains during the documented compatibility period;
+- historical customer/PIN columns remain available for data import, but public PIN ticket submission is disabled;
 - canonical permission fallbacks such as `all_tickets` remain until production roles are migrated;
 - old invitation/audit retention cleanup has no destructive migration and requires a retention decision;
 - repository-wide legacy formatting cleanup and the breaking Vite upgrade are separate maintenance work.

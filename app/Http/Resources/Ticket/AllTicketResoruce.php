@@ -19,7 +19,7 @@ class AllTicketResoruce extends JsonResource
         return [
             'ticketId' => $this->id,
             'ticketNumber' => $this->ticket_number,
-            'customerName' => $this->customer?->getFullName() ?? '',
+            'customerName' => $this->requesterName(),
             'companyName' => $this->company?->name ?? '',
             'branchName' => $this->branch?->name ?? '',
             'status' => $this->status,

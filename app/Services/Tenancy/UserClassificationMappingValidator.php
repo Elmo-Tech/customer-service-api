@@ -5,6 +5,7 @@ namespace App\Services\Tenancy;
 use App\Enums\Company\BranchStatus;
 use App\Enums\Company\CompanyStatus;
 use App\Enums\User\AccountType;
+use App\Enums\User\TenantRole;
 use App\Models\Company\Branch;
 use App\Models\Company\Company;
 use App\Models\User;
@@ -28,7 +29,7 @@ class UserClassificationMappingValidator
     {
         return new TenantMappingReferenceData(
             User::withTrashed()->get(['id', 'username', 'email'])->keyBy('id'),
-            Company::withTrashed()->get(['id', 'status', 'deleted_at'])->keyBy('id'),
+            Company::withTrashed()->get(['id', 'status', 'uses_branches', 'deleted_at'])->keyBy('id'),
             Branch::withTrashed()->get(['id', 'company_id', 'status', 'deleted_at'])->keyBy('id'),
             Role::where('guard_name', 'api')->pluck('name')->all(),
         );
@@ -63,7 +64,7 @@ class UserClassificationMappingValidator
             $this->identityErrors($mappingRow, $references->users->get((int) $mappingRow['user_id'])),
             $this->accountErrors($mappingRow),
             $this->companyErrors($mappingRow, $references->companies),
-            $this->branchErrors($mappingRow, $references->branches),
+            $this->branchErrors($mappingRow, $references->branches, $references->companies),
             $this->roleErrors($mappingRow, $references->roleNames),
         ))->all();
     }
@@ -130,8 +131,21 @@ class UserClassificationMappingValidator
         return [];
     }
 
-    private function branchErrors(array $mappingRow, Collection $branches): array
+    private function branchErrors(array $mappingRow, Collection $branches, Collection $companies): array
     {
+        $company = $companies->get((int) $mappingRow['company_id']);
+
+        if ($company && ! $company->uses_branches && $mappingRow['branch_id'] !== '') {
+            return ["Line {$mappingRow['line']} branchless company cannot assign branch_id."];
+        }
+
+        $branchRequiredRoles = [TenantRole::BRANCH_MANAGER->value, TenantRole::EMPLOYEE->value];
+        if ($company?->uses_branches
+            && in_array($mappingRow['intended_role'], $branchRequiredRoles, true)
+            && $mappingRow['branch_id'] === '') {
+            return ["Line {$mappingRow['line']} role requires branch_id for this company."];
+        }
+
         if ($mappingRow['branch_id'] === '') {
             return [];
         }
@@ -161,9 +175,20 @@ class UserClassificationMappingValidator
     private function roleErrors(array $mappingRow, array $roleNames): array
     {
         $roleErrors = [];
+        $tenantRoleNames = array_column(TenantRole::cases(), 'value');
+        $isTenantAccount = $mappingRow['account_type'] === AccountType::TENANT->value;
+        $isTenantRole = in_array($mappingRow['intended_role'], $tenantRoleNames, true);
 
         if ($mappingRow['intended_role'] === '' || ! in_array($mappingRow['intended_role'], $roleNames, true)) {
             $roleErrors[] = "Line {$mappingRow['line']} references an invalid intended_role.";
+        }
+
+        if ($isTenantAccount && ! $isTenantRole) {
+            $roleErrors[] = "Line {$mappingRow['line']} tenant account requires a tenant role.";
+        }
+
+        if ($mappingRow['account_type'] === AccountType::INTERNAL->value && $isTenantRole) {
+            $roleErrors[] = "Line {$mappingRow['line']} internal account cannot use a tenant role.";
         }
 
         if ($mappingRow['mapping_authority_notes'] === '') {

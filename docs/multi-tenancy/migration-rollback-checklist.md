@@ -29,7 +29,7 @@
 - [ ] Queue worker and mail transport deliver after-commit invitation mail; resend is verified after a simulated delivery failure.
 - [ ] `onboard_company` and resource export permissions are assigned only through the approved role mapping.
 - [ ] No public storage URL bypasses attachment authorization before tenant rollout.
-- [ ] `/me` and authenticated submission work before disabling PIN submission.
+- [ ] `/me` and authenticated submission work; confirm public PIN submission remains disabled.
 - [ ] New review capabilities work before revoking legacy links.
 - [ ] Dashboard and export totals match authorized ticket lists.
 

@@ -30,7 +30,7 @@ class AdminTicketController extends Controller
         $this->middleware('permission:edit_ticket')->only('edit');
         $this->middleware('permission:update_ticket')->only('update');
         $this->middleware('permission:delete_ticket')->only('delete');
-        $this->middleware('permission:all_tickets')->only('create');
+        $this->middleware('permission:create_ticket|all_tickets')->only('create');
     }
 
     public function create(CreateAuthenticatedTicketRequest $request): JsonResponse

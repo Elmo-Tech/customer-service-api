@@ -18,7 +18,7 @@ class TicketReviewResource extends JsonResource
             'description' => $this->description,
             'customer' => [
                 'id' => $this->customer?->id,
-                'name' => trim(($this->customer?->firstname ?? '').' '.($this->customer?->lastname ?? '')),
+                'name' => $this->requesterName(),
             ],
             'company' => ['id' => $this->company?->id, 'name' => $this->company?->name],
             'attachments' => $this->attachments->map(

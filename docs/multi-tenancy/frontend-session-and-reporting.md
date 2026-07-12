@@ -26,7 +26,7 @@ The frontend API base defaults to `https://customerservicebe.testingelmo.com/api
 | `/dashboard/admins` | internal account and `all_users` |
 | `/dashboard/roles` | internal account and `all_roles` |
 
-Direct disallowed navigation renders a 403 result. These checks only control presentation; altering Zustand, URLs, DOM, filters, or selectors does not grant backend access. Tenant ticket filters omit company selection. The authenticated submission page omits company, PIN, and status inputs; `POST /api/v1/admin/tickets/create` derives company, assigned branch, opened-by user, and open status, and validates the customer through the caller's tenant scope. Branchless tenant submission stores no synthetic branch. The public `/` PIN workflow remains as a compatibility route.
+Direct disallowed navigation renders a 403 result. These checks only control presentation; altering Zustand, URLs, DOM, filters, or selectors does not grant backend access. Tenant ticket filters omit company selection. The authenticated submission page omits company, customer, PIN, and status inputs; `POST /api/v1/admin/tickets/create` derives company, assigned branch, opened-by user, and open status. Branchless tenant submission stores no synthetic branch. `/` redirects unauthenticated visitors to login and authenticated tenant users to ticket submission. Only review and invitation setup remain public-purpose pages.
 
 ## Reporting UI contract
 
@@ -42,7 +42,7 @@ Ticket export calls `GET /api/v1/admin/tickets/export` once with the active filt
 - [ ] Confirm rejected refresh, replay, logout, inactive user, inactive company, and inactive branch states fail closed.
 - [ ] Confirm internal, company, branch, employee, and branchless menus and direct-route 403 behavior.
 - [ ] Confirm tenant filters cannot present company widening controls and altered requests remain backend-scoped.
-- [ ] Confirm authenticated employee submission and own-ticket listing; retain and separately verify the public PIN route.
+- [ ] Confirm authenticated employee submission and own-ticket listing; verify the removed public PIN endpoint returns 404.
 - [ ] Confirm dashboard empty/error/loading states, all series, branchless behavior, and filter parity with ticket list totals.
 - [ ] Confirm export makes one streamed request and preserves active filters.
 - [ ] Confirm review view, attachment, and submission calls carry no access bearer and use the review capability flow.

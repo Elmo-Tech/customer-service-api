@@ -54,10 +54,10 @@ class TicketReviewService
 
     private function sendReopenedNotification(Ticket $ticket, string $text): void
     {
-        $ticket->load(['customer', 'company', 'attachments']);
+        $ticket->load(['customer', 'openedBy', 'company', 'attachments']);
         $mailContent = [
             'subject' => 'ticket: '.$ticket->ticket_number.' | Riaperta | '
-                .$ticket->customer->getFullName().' | '.$ticket->company->name,
+                .$ticket->requesterName().' | '.$ticket->company->name,
             'body' => 'stato: Riaperta | data: '.Carbon::parse($ticket->updated_at)->format('d/m/Y H:m')
                 .'<br><br><br>'.$text,
             'attachments' => $ticket->attachments

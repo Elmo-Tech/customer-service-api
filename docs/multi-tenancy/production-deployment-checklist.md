@@ -5,6 +5,7 @@ Production is not approved until every required item below has evidence attached
 ## Data and database
 
 - [ ] Complete and validate the authoritative production user classification mapping.
+- [ ] Apply the validated mapping with `tenancy:apply-mapping --execute`, then confirm no active user remains unclassified.
 - [ ] Capture a verified backup and perform a restore rehearsal.
 - [ ] Rehearse all additive migrations and rollbacks against a MySQL-connected production-like copy.
 - [ ] Inventory row counts and relationships before and after rehearsal: companies, branches, customers, tickets, attachments, logs, users, roles, permissions, refresh sessions, review capabilities, invitations, and audit events.
@@ -31,7 +32,7 @@ Production is not approved until every required item below has evidence attached
 
 - [ ] Complete the browser checklist in `frontend-session-and-reporting.md`.
 - [ ] Verify onboarding step validation, back/forward state preservation, hidden branch stripping, review, success recovery, and field-level server errors.
-- [ ] Verify company, branch, team, employee, dashboard, export, setup-password, public review, and legacy PIN pages across supported viewport sizes.
+- [ ] Verify company, branch, team, employee submission, dashboard, export, setup-password, and public review pages across supported viewport sizes.
 - [ ] Confirm `npm audit --omit=dev` remains clean and the production bundle matches the reviewed artifact.
 - [ ] Keep the Vite development server private until the separately approved breaking upgrade resolves its development-only advisories.
 
@@ -39,6 +40,6 @@ Production is not approved until every required item below has evidence attached
 
 - [ ] Define the compatibility observation period and rollback owner.
 - [ ] Do not delete legacy public attachment copies until backup, migration audit, and observation gates pass.
-- [ ] Do not remove legacy ticket review tokens or the public PIN route until migrated replacements are verified and product owners approve contraction.
+- [ ] Do not remove legacy ticket review tokens until migrated replacements are verified and product owners approve contraction.
 - [ ] Define invitation and tenant-audit retention before any cleanup migration.
 - [ ] Commit, deploy, migrate, and clean up only through separately authorized production change control.

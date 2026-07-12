@@ -5,6 +5,7 @@ namespace Tests\Feature\Tenancy;
 use App\Enums\Company\BranchStatus;
 use App\Enums\Company\CompanyStatus;
 use App\Enums\User\AccountType;
+use App\Enums\User\TenantRole;
 use App\Models\Company\Branch;
 use App\Models\Company\Company;
 use App\Models\User;
@@ -30,11 +31,13 @@ class UserClassificationMappingValidatorTest extends TestCase
     {
         parent::setUp();
 
-        Role::create(['name' => 'Approved Role', 'guard_name' => 'api']);
+        Role::create(['name' => 'Internal Admin', 'guard_name' => 'api']);
+        Role::create(['name' => TenantRole::EMPLOYEE->value, 'guard_name' => 'api']);
         $this->internalUser = $this->user(1, 'internal-user');
         $this->tenantCompany = Company::create([
             'name' => 'Tenant Company',
             'status' => CompanyStatus::ACTIVE->value,
+            'uses_branches' => true,
         ]);
         $this->tenantBranch = $this->tenantCompany->branches()->create([
             'name' => 'Tenant Branch',
@@ -122,6 +125,23 @@ class UserClassificationMappingValidatorTest extends TestCase
         $this->assertContains('Line 3 references unknown branch_id.', $this->errors($rows));
     }
 
+    public function test_branch_assignment_matches_company_branch_mode_and_role(): void
+    {
+        $missingRequiredBranch = $this->replaceTenant(['branch_id' => '']);
+        $missingRequiredBranchErrors = $this->errors($missingRequiredBranch);
+        $this->tenantCompany->update(['uses_branches' => false]);
+        $branchOnBranchlessCompany = $this->validRows();
+
+        $this->assertContains(
+            'Line 3 role requires branch_id for this company.',
+            $missingRequiredBranchErrors,
+        );
+        $this->assertContains(
+            'Line 3 branchless company cannot assign branch_id.',
+            $this->errors($branchOnBranchlessCompany),
+        );
+    }
+
     public function test_invalid_roles_and_missing_mapping_authority_are_rejected(): void
     {
         $rows = $this->replaceTenant([
@@ -132,6 +152,22 @@ class UserClassificationMappingValidatorTest extends TestCase
 
         $this->assertContains('Line 3 references an invalid intended_role.', $errors);
         $this->assertContains('Line 3 requires mapping authority or notes.', $errors);
+    }
+
+    public function test_roles_must_match_the_account_scope(): void
+    {
+        $tenantWithInternalRole = $this->replaceTenant(['intended_role' => 'Internal Admin']);
+        $internalWithTenantRole = $this->validRows();
+        $internalWithTenantRole[0]['intended_role'] = TenantRole::EMPLOYEE->value;
+
+        $this->assertContains(
+            'Line 3 tenant account requires a tenant role.',
+            $this->errors($tenantWithInternalRole),
+        );
+        $this->assertContains(
+            'Line 2 internal account cannot use a tenant role.',
+            $this->errors($internalWithTenantRole),
+        );
     }
 
     public function test_identity_mismatches_are_rejected(): void
@@ -183,7 +219,7 @@ class UserClassificationMappingValidatorTest extends TestCase
             'account_type' => $accountType->value,
             'company_id' => $isTenant ? (string) $this->tenantCompany->id : '',
             'branch_id' => $isTenant ? (string) $this->tenantBranch->id : '',
-            'intended_role' => 'Approved Role',
+            'intended_role' => $isTenant ? TenantRole::EMPLOYEE->value : 'Internal Admin',
             'mapping_authority_notes' => 'Approved by system owner',
             'line' => $user->id + 1,
         ];

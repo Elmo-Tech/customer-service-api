@@ -113,13 +113,13 @@ class TicketDashboardService
     private function oldestOpen(Builder $tickets)
     {
         return (clone $tickets)->whereIn('status', [TicketStatus::OPENED->value, TicketStatus::REOPENED->value])
-            ->with(['customer:id,firstname,lastname', 'company:id,name', 'branch:id,name'])
+            ->with(['customer:id,firstname,lastname', 'openedBy:id,name', 'company:id,name', 'branch:id,name'])
             ->orderBy('created_at')->limit(10)->get();
     }
 
     private function recentActivity(Builder $tickets)
     {
-        return (clone $tickets)->with(['customer:id,firstname,lastname', 'company:id,name', 'branch:id,name'])
+        return (clone $tickets)->with(['customer:id,firstname,lastname', 'openedBy:id,name', 'company:id,name', 'branch:id,name'])
             ->orderByDesc('updated_at')->limit(10)->get();
     }
 
@@ -128,7 +128,7 @@ class TicketDashboardService
         return $tickets->map(fn (Ticket $ticket) => [
             'ticketId' => $ticket->id,
             'ticketNumber' => $ticket->ticket_number,
-            'customerName' => $ticket->customer?->getFullName() ?? '',
+            'customerName' => $ticket->requesterName(),
             'companyName' => $ticket->company?->name ?? '',
             'branchName' => $ticket->branch?->name ?? '',
             'status' => $ticket->getRawOriginal('status'),

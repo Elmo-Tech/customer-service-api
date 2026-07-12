@@ -4,7 +4,6 @@ namespace App\Services\Ticket;
 
 use App\Enums\Ticket\TicketImportanceStatus;
 use App\Enums\Ticket\TicketStatus;
-use App\Models\Company\Customer;
 use App\Models\Tiket\Ticket;
 use App\Models\User;
 use App\Services\Tenancy\TenantContext;
@@ -19,14 +18,17 @@ class TicketService
 
     public function allTickets(User $user, array $filters)
     {
-        return $this->ticketQuery->filtered($user, $filters)->orderBy('created_at', 'desc')->get();
+        return $this->ticketQuery->filtered($user, $filters)
+            ->with(['customer:id,firstname,lastname', 'openedBy:id,name', 'company:id,name', 'branch:id,name'])
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 
     public function createTicket(array $ticketData): Ticket
     {
         $this->referenceValidator->validate(
             $ticketData['companyId'],
-            $ticketData['customerId'],
+            $ticketData['customerId'] ?? null,
             $ticketData['branchId'] ?? null,
         );
 
@@ -35,7 +37,7 @@ class TicketService
             'status' => TicketStatus::from($ticketData['status'])->value,
             'importance' => TicketImportanceStatus::from($ticketData['importance'])->value,
             'description' => $ticketData['description'],
-            'customer_id' => $ticketData['customerId'],
+            'customer_id' => $ticketData['customerId'] ?? null,
             'branch_id' => $ticketData['branchId'] ?? null,
             'closed_at' => null,
             'tag_id' => $ticketData['tagId'] ?? null,
@@ -48,7 +50,6 @@ class TicketService
     {
         $context = new TenantContext($user);
         $companyId = $context->tenantCompanyId();
-        $context->scopeCustomers(Customer::query())->findOrFail($ticketData['customerId']);
         $branchId = $user->branch_id
             ? $context->tenantBranchId()
             : ($ticketData['branchId'] ?? null);
@@ -56,6 +57,7 @@ class TicketService
         $ticket = $this->createTicket([
             ...$ticketData,
             'companyId' => $companyId,
+            'customerId' => null,
             'branchId' => $branchId,
             'status' => TicketStatus::OPENED->value,
             'openedByUserId' => $user->id,
@@ -67,7 +69,7 @@ class TicketService
     public function editTicket(User $user, int $ticketId): Ticket
     {
         return $this->ticketQuery->filtered($user, [])
-            ->with(['attachments', 'customer'])
+            ->with(['attachments', 'customer', 'openedBy'])
             ->findOrFail($ticketId);
     }
 
@@ -82,7 +84,7 @@ class TicketService
         $this->validateImmutableCompany($ticket, $ticketData);
         $this->referenceValidator->validate(
             $ticket->company_id,
-            $ticketData['customerId'],
+            $ticketData['customerId'] ?? null,
             $ticketData['branchId'] ?? null,
         );
         $ticket->update($this->updatedAttributes($ticketData));
@@ -111,7 +113,7 @@ class TicketService
             'status' => $status->value,
             'importance' => TicketImportanceStatus::from($ticketData['importance'])->value,
             'description' => $ticketData['description'],
-            'customer_id' => $ticketData['customerId'],
+            'customer_id' => $ticketData['customerId'] ?? null,
             'branch_id' => $ticketData['branchId'] ?? null,
             'closed_at' => $closedAt,
             'tag_id' => $ticketData['tagId'] ?? null,

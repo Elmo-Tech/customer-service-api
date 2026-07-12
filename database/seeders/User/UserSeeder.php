@@ -2,11 +2,11 @@
 
 namespace Database\Seeders\User;
 
+use App\Enums\User\AccountType;
 use App\Enums\User\UserStatus;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
-
 
 class UserSeeder extends Seeder
 {
@@ -15,22 +15,28 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        $admin = config('initial_admin');
+        if (in_array(null, $admin, true) || in_array('', $admin, true)) {
+            $this->command?->warn('Initial admin was not seeded. Configure SEED_ADMIN_* values first.');
 
-        //$usersCount = max((int) $this->command->ask('How many users would you like?', 10),1);
+            return;
+        }
 
-        $user = User::create([
-            'name' => 'Hesham Atef',
-            'username'=> 'admin',
-            'email'=> 'lTqFP@example.com',
+        $user = User::query()->firstOrCreate([
+            'username' => $admin['username'],
+        ], [
+            'name' => $admin['name'],
+            'email' => $admin['email'],
             'status' => UserStatus::ACTIVE->value,
-            'address' => 'جوجر',
-            'phone' => '01018557045',
-            'password' => 'M@Ns123456',
+            'password' => $admin['password'],
+            'account_type' => AccountType::INTERNAL->value,
         ]);
 
-        $role = Role::findByName('مدير');
+        if ($user->account_type === null) {
+            $user->update(['account_type' => AccountType::INTERNAL->value]);
+        }
 
-        $user->assignRole($role);
+        $user->syncRoles([Role::findByName('مدير', 'api')]);
 
     }
 }

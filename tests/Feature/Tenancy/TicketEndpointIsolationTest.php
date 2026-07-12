@@ -144,12 +144,10 @@ class TicketEndpointIsolationTest extends TestCase
     {
         $employee = $this->tenantUser('submitting-employee', TenantRole::EMPLOYEE, $this->tenantBranch);
         $employee->givePermissionTo('all_tickets');
-        $this->tenantCustomer->update(['user_id' => $employee->id, 'branch_id' => $this->tenantBranch->id]);
 
         $this->actingAs($employee, 'api')->postJson('/api/v1/admin/tickets/create', [
             'importance' => TicketImportanceStatus::GREEN->value,
             'description' => 'Authenticated submission',
-            'customerId' => $this->tenantCustomer->id,
             'branchId' => $this->otherTenantBranch->id,
         ])->assertCreated();
 
@@ -157,12 +155,13 @@ class TicketEndpointIsolationTest extends TestCase
             'description' => 'Authenticated submission',
             'company_id' => $this->tenantCompany->id,
             'branch_id' => $this->tenantBranch->id,
+            'customer_id' => null,
             'opened_by_user_id' => $employee->id,
             'status' => TicketStatus::OPENED->value,
         ]);
     }
 
-    public function test_authenticated_submission_rejects_cross_tenant_customer(): void
+    public function test_authenticated_submission_ignores_client_customer_identity(): void
     {
         $owner = $this->tenantUser('submitting-owner', TenantRole::COMPANY_OWNER, $this->tenantBranch);
         $owner->givePermissionTo('all_tickets');
@@ -171,9 +170,13 @@ class TicketEndpointIsolationTest extends TestCase
             'importance' => TicketImportanceStatus::GREEN->value,
             'description' => 'Cross tenant submission',
             'customerId' => $this->otherCustomer->id,
-        ])->assertNotFound();
+        ])->assertCreated();
 
-        $this->assertDatabaseMissing('tickets', ['description' => 'Cross tenant submission']);
+        $this->assertDatabaseHas('tickets', [
+            'description' => 'Cross tenant submission',
+            'customer_id' => null,
+            'opened_by_user_id' => $owner->id,
+        ]);
     }
 
     public function test_branchless_employee_can_submit_authenticated_ticket(): void
@@ -181,13 +184,9 @@ class TicketEndpointIsolationTest extends TestCase
         $company = $this->company('Employee Branchless', false);
         $employee = $this->tenantUser('branchless-employee', TenantRole::EMPLOYEE, null, $company);
         $employee->givePermissionTo('all_tickets');
-        $customer = $this->customer($company, 'Employee Branchless');
-        $customer->update(['user_id' => $employee->id]);
-
         $this->actingAs($employee, 'api')->postJson('/api/v1/admin/tickets/create', [
             'importance' => TicketImportanceStatus::GREEN->value,
             'description' => 'Authenticated branchless submission',
-            'customerId' => $customer->id,
         ])->assertCreated();
 
         $this->assertDatabaseHas('tickets', [
@@ -250,43 +249,11 @@ class TicketEndpointIsolationTest extends TestCase
         );
     }
 
-    public function test_legacy_submission_derives_company_and_rejects_cross_company_branch(): void
+    public function test_public_pin_submission_is_disabled(): void
     {
-        $response = $this->postJson('/api/v1/tickets/create', [
-            'status' => TicketStatus::DONE->value,
-            'importance' => TicketImportanceStatus::GREEN->value,
-            'description' => 'Altered tenant identifiers',
-            'customerId' => $this->tenantCustomer->id,
-            'pin' => '1234',
-            'companyId' => $this->otherCompany->id,
-            'branchId' => $this->otherCompanyBranch->id,
-        ]);
-
-        $response->assertUnprocessable();
-        $this->assertDatabaseMissing('tickets', ['description' => 'Altered tenant identifiers']);
-    }
-
-    public function test_legacy_submission_supports_branchless_company_and_forces_open_status(): void
-    {
-        $branchlessCompany = $this->company('Public Branchless', false);
-        $customer = $this->customer($branchlessCompany, 'Public Branchless');
-
         $this->postJson('/api/v1/tickets/create', [
-            'status' => TicketStatus::DONE->value,
-            'importance' => TicketImportanceStatus::GREEN->value,
-            'description' => 'Branchless submission',
-            'customerId' => $customer->id,
             'pin' => '1234',
-            'companyId' => $this->otherCompany->id,
-            'branchId' => null,
-        ])->assertOk();
-
-        $this->assertDatabaseHas('tickets', [
-            'company_id' => $branchlessCompany->id,
-            'customer_id' => $customer->id,
-            'branch_id' => null,
-            'status' => TicketStatus::OPENED->value,
-        ]);
+        ])->assertNotFound();
     }
 
     public function test_role_management_requires_internal_account_and_permission(): void

@@ -47,6 +47,7 @@ Rules:
 - Internal rows have empty `company_id` and `branch_id`.
 - Tenant rows have an active `company_id`; `branch_id` may be empty only when the authoritative assignment is company-wide or branchless.
 - `intended_role` is an existing API role name from the audit.
+- Tenant accounts use one of `company_owner`, `company_manager`, `branch_manager`, or `employee`; internal accounts cannot use those tenant roles.
 - `mapping_authority_notes` names the person or business source that approved the classification. Do not use role names, email domains, `created_by`, or other inferred clues as authority.
 
 ## Validate without writes
@@ -64,6 +65,24 @@ Mapping is valid. Dry-run completed without database writes.
 ```
 
 Any failure exits non-zero and identifies the rejected rows or missing users. Correct the CSV and rerun; do not edit account rows manually.
+
+## Apply the validated mapping
+
+Application is a separate, explicit production change. Run the command without `--execute` first; it validates again and performs no writes:
+
+```bash
+php artisan tenancy:apply-mapping storage/app/tenancy/user-classification-mapping.csv
+```
+
+After backup/restore evidence and review of the completed CSV, apply every row atomically:
+
+```bash
+php artisan tenancy:apply-mapping \
+  storage/app/tenancy/user-classification-mapping.csv \
+  --execute
+```
+
+The command asks for confirmation, locks the mapped users, assigns account scope and the authoritative role inside one transaction, and writes redacted tenant audit events. Validation, identity drift, role, or database errors roll back the entire operation.
 
 ## Sanitized artifacts needed to unblock enforcement
 

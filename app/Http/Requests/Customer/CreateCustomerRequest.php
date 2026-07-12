@@ -28,7 +28,7 @@ class CreateCustomerRequest extends FormRequest
         return [
             'firstname' => ['required'],
             'lastname' => ['required'],
-            'pin' => ['required'],
+            'pin' => ['nullable', 'string'],
             'companyId' => 'required',
             'branchId' => ['nullable', 'integer'],
             'status' => ['required', new Enum(CustomerStatus::class)],

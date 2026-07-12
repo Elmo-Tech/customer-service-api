@@ -17,7 +17,7 @@ class TicketExportService
     public function download(User $user, array $filters): StreamedResponse
     {
         $tickets = $this->ticketQuery->filtered($user, $filters)
-            ->with(['customer:id,firstname,lastname', 'company:id,name', 'branch:id,name']);
+            ->with(['customer:id,firstname,lastname', 'openedBy:id,name', 'company:id,name', 'branch:id,name']);
 
         return response()->streamDownload(
             fn () => $this->writeCsv($tickets),
@@ -48,7 +48,7 @@ class TicketExportService
     {
         return array_map($this->safeCell(...), [
             $ticket->ticket_number,
-            $ticket->customer?->getFullName() ?? '',
+            $ticket->requesterName(),
             $ticket->company?->name ?? '',
             $ticket->branch?->name ?? '',
             TicketStatus::from((int) $ticket->getRawOriginal('status'))->name,

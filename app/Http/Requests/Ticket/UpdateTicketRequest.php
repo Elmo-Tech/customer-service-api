@@ -33,7 +33,7 @@ class UpdateTicketRequest extends FormRequest
             'description' => ['required', 'string'],
             'companyId' => ['required'],
             'branchId' => ['nullable', 'integer'],
-            'customerId' => ['required'],
+            'customerId' => ['nullable', 'integer'],
             'tagId' => ['nullable'],
             'closedAt' => ['nullable'],
         ];

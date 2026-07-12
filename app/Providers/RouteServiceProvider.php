@@ -50,7 +50,6 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('refresh', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
         RateLimiter::for('logout', fn (Request $request) => Limit::perMinute(30)->by($request->user()?->id ?: $request->ip()));
         RateLimiter::for('ticket-review', fn (Request $request) => Limit::perMinute(20)->by($request->ip()));
-        RateLimiter::for('ticket-submit', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
         RateLimiter::for('invitation-setup', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
         RateLimiter::for('invitation-resend', fn (Request $request) => Limit::perMinute(5)->by($request->user()?->id ?: $request->ip()));
     }

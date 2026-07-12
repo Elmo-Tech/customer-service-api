@@ -12,11 +12,13 @@ use Illuminate\Validation\ValidationException;
 
 class TicketReferenceValidator
 {
-    public function validate(int $companyId, int $customerId, ?int $branchId): void
+    public function validate(int $companyId, ?int $customerId, ?int $branchId): void
     {
         $company = Company::query()->findOrFail($companyId);
         $this->validateActiveCompany($company);
-        $this->validateCustomer($companyId, $customerId);
+        if ($customerId !== null) {
+            $this->validateCustomer($companyId, $customerId);
+        }
 
         if ($company->uses_branches) {
             $this->validateRequiredBranch($companyId, $branchId);

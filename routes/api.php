@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\Private\Customer\CustomerController;
 use App\Http\Controllers\Api\Private\Role\RoleController;
 use App\Http\Controllers\Api\Private\Select\SelectController;
 use App\Http\Controllers\Api\Private\Ticket\AdminTicketController;
-use App\Http\Controllers\Api\Private\Ticket\CustomerTicketController;
 use App\Http\Controllers\Api\Private\Ticket\TicketAttachmentController;
 use App\Http\Controllers\Api\Private\Ticket\TicketLogController;
 use App\Http\Controllers\Api\Private\Ticket\TicketPublicController;
@@ -87,10 +86,6 @@ Route::prefix('v1/admin/tickets')->group(function () {
     Route::delete('delete', [AdminTicketController::class, 'delete']);
     Route::get('export', [TicketReportController::class, 'export'])->name('tickets.export');
     Route::get('dashboard', [TicketReportController::class, 'dashboard'])->name('tickets.dashboard');
-});
-
-Route::prefix('v1/tickets')->group(function () {
-    Route::post('create', [CustomerTicketController::class, 'create'])->middleware('throttle:ticket-submit');
 });
 
 Route::prefix('v1/admin/roles')->group(function () {

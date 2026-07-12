@@ -35,7 +35,7 @@
 - Axios uses the testing API base URL and reads `token` from `document.cookie` before each request.
 - Login stores token, profile, role, permissions, and logout time in JavaScript-readable cookies.
 - Dashboard guards trust cookie profile data; navigation trusts cookie role and permission data.
-- `/` is a public PIN-based ticket form. It fetches global companies/customers, fetches the selected company's branches, selects the first branch, and refuses submission without one.
+- `/` is a session-aware redirect: unauthenticated visitors go to login, tenant users go to authenticated submission, and internal users go to the dashboard.
 - `/dashboard` exposes ticket, customer, user, and role screens. Dashboard content is a placeholder.
 - Ticket export fetches all pages client-side; backend scope therefore governs export safety.
 - `/review` consumes the public ticket review endpoints.
@@ -43,7 +43,7 @@
 ## Compatibility hazards
 
 - Branchless tickets are allowed by the database but rejected by request validation and public UI logic; ticket list serialization dereferences a branch unconditionally.
-- Ticket number generation embeds `customer_id`; legacy customer identity must remain supported.
+- Ticket number generation uses the historical `customer_id` when present and otherwise the authenticated `opened_by_user_id`; imported customer identity remains supported.
 - Ticket and public review resources assume customer/company relationships exist.
 - Public disk URLs bypass future controller policies unless file delivery changes.
 - Existing permission names such as `all_tickets` must remain mapped while canonical capabilities are introduced.
