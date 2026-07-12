@@ -20,7 +20,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => array_values(array_filter([
-        env('FRONTEND_URL', 'http://tickets-sys.testingelmo.com'),
+        env('FRONTEND_URL', 'https://tickets-sys.testingelmo.com'),
         env('FRONTEND_DEV_URL', 'http://localhost:5173'),
     ])),
 

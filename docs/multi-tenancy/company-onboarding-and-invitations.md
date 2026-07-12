@@ -39,6 +39,6 @@ Every text cell beginning with optional whitespace followed by `=`, `+`, `-`, or
 ## Configuration and rollback
 
 - `ACCOUNT_INVITATION_TTL` defaults to 1440 minutes.
-- `ACCOUNT_INVITATION_FRONTEND_URL` defaults to `https://tickets.testingelmo.com/setup-password`.
+- `ACCOUNT_INVITATION_FRONTEND_URL` defaults to `https://tickets-sys.testingelmo.com/setup-password`.
 
 Both new tables are additive and reversible. Application rollback may stop onboarding, setup, resend, revoke, and resource export traffic while retaining rows for investigation. Do not drop invitation or audit tables after invitations have been issued without an approved retention/export decision. Individual company, branch, customer, and user endpoints remain unchanged.

@@ -13,7 +13,7 @@ The deployed frontend still stores the access JWT in a JavaScript-readable cooki
 
 ## Refresh cookie deployment configuration
 
-Current deployment uses `http://tickets.testingelmo.com` for the frontend and `https://customerservicebe.testingelmo.com` for the API. Because modern browsers treat the scheme difference as cross-site, the refresh cookie defaults are:
+Current deployment uses `https://tickets-sys.testingelmo.com` for the frontend and `https://tickets-sys-api.testingelmo.com` for the API. Credentialed CORS must allow the frontend origin exactly, including the `https` scheme. The refresh cookie defaults are:
 
 | Setting | Default | Reason |
 |---|---|---|
