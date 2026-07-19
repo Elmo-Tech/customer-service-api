@@ -44,5 +44,10 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
+        RateLimiter::for('public-ticket-identify', fn (Request $request) => Limit::perMinute(5)->by(
+            hash('sha256', strtolower((string) $request->input('username')).'|'.$request->ip()),
+        ));
+        RateLimiter::for('public-ticket-create', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+        RateLimiter::for('public-ticket-options', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
     }
 }

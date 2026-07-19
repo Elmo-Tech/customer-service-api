@@ -8,9 +8,10 @@ use App\Models\Company\Customer;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class CustomerService{
-
+class CustomerService
+{
     private $customer;
+
     public function __construct(Customer $customer)
     {
         $this->customer = $customer;
@@ -20,7 +21,7 @@ class CustomerService{
     {
         $customers = QueryBuilder::for(Customer::class)
             ->allowedFilters([
-                AllowedFilter::custom('search', new FilterCustomer()), // Add a custom search filter
+                AllowedFilter::custom('search', new FilterCustomer), // Add a custom search filter
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('company', 'company_id'),
             ])->get();
@@ -35,10 +36,11 @@ class CustomerService{
         $customer = Customer::create([
             'firstname' => $customerData['firstname'],
             'lastname' => $customerData['lastname'],
+            'username' => $customerData['username'],
             'pin' => $customerData['pin'],
             'company_id' => $customerData['companyId'],
             'status' => CustomerStatus::from($customerData['status'])->value,
-            'email' => $customerData['email']??null,
+            'email' => $customerData['email'] ?? null,
         ]);
 
         return $customer;
@@ -58,18 +60,17 @@ class CustomerService{
         $customer->update([
             'firstname' => $customerData['firstname'],
             'lastname' => $customerData['lastname'],
+            'username' => $customerData['username'],
             'pin' => $customerData['pin'],
             'company_id' => $customerData['companyId'],
             'status' => CustomerStatus::from($customerData['status'])->value,
-            'email' => $customerData['email']??null,
+            'email' => $customerData['email'] ?? null,
 
         ]);
 
         return $customer;
 
-
     }
-
 
     public function deleteCustomer(int $customerId)
     {
@@ -77,6 +78,4 @@ class CustomerService{
         return Customer::find($customerId)->delete();
 
     }
-
-
 }

@@ -11,19 +11,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
 {
-    use HasFactory, SoftDeletes, CreatedUpdatedBy;
+    use CreatedUpdatedBy, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'firstname',
         'lastname',
+        'username',
         'pin',
         'status',
         'company_id',
-        'email'
+        'email',
     ];
 
     protected $cast = [
-        'status' => CustomerStatus::class
+        'status' => CustomerStatus::class,
     ];
 
     public function company(): BelongsTo
@@ -31,10 +32,9 @@ class Customer extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function getFullName(){
+    public function getFullName()
+    {
 
-        return $this->firstname . " " . $this->lastname;
+        return $this->firstname.' '.$this->lastname;
     }
-
-
 }

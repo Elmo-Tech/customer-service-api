@@ -11,15 +11,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Company extends Model
 {
-    use HasFactory, SoftDeletes, CreatedUpdatedBy;
+    use CreatedUpdatedBy, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'name',
-        'status'
+        'status',
+        'legacy_ticket_enabled',
     ];
 
     protected $cast = [
-        'status' => CompanyStatus::class
+        'status' => CompanyStatus::class,
+        'legacy_ticket_enabled' => 'boolean',
     ];
 
     public function branches(): HasMany

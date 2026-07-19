@@ -2,19 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Company\BranchStatus;
+use App\Enums\Company\CompanyStatus;
+use App\Enums\Company\CustomerStatus;
 use App\Enums\Ticket\TicketImportanceStatus;
 use App\Enums\Ticket\TicketStatus;
 use App\Mail\ClosedTicketDetails;
 use App\Mail\TicketDetails;
-use App\Models\Company\Branch;
 use App\Models\Company\Company;
 use App\Models\Company\Customer;
 use App\Models\Tiket\Ticket;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class TicketEmailFlowTest extends TestCase
@@ -160,13 +162,21 @@ class TicketEmailFlowTest extends TestCase
             'password' => 'password',
         ]);
 
-        $company = Company::create(['name' => 'Acme']);
-        $company->branches()->create(['name' => 'Main']);
+        $company = Company::create([
+            'name' => 'Acme',
+            'status' => CompanyStatus::ACTIVE->value,
+            'legacy_ticket_enabled' => true,
+        ]);
+        $company->branches()->create([
+            'name' => 'Main',
+            'status' => BranchStatus::ACTIVE->value,
+        ]);
 
         return Customer::create([
             'firstname' => 'Mario',
             'lastname' => 'Rossi',
             'pin' => '1234',
+            'status' => CustomerStatus::ACTIVE->value,
             'company_id' => $company->id,
             'email' => 'customer@example.com',
         ]);

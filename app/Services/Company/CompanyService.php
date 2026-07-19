@@ -8,9 +8,10 @@ use App\Models\Company\Company;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class CompanyService{
-
+class CompanyService
+{
     private $company;
+
     public function __construct(Company $company)
     {
         $this->company = $company;
@@ -19,11 +20,11 @@ class CompanyService{
     public function allCompanies()
     {
         $companies = QueryBuilder::for(Company::class)
-        ->with('branches')
-        ->allowedFilters([
-            AllowedFilter::custom('search', new FilterCompany()), // Add a custom search filter
-            AllowedFilter::exact('status'),
-        ])->get();
+            ->with('branches')
+            ->allowedFilters([
+                AllowedFilter::custom('search', new FilterCompany), // Add a custom search filter
+                AllowedFilter::exact('status'),
+            ])->get();
 
         return $companies;
 
@@ -35,6 +36,7 @@ class CompanyService{
         $company = Company::create([
             'name' => $companyData['name'],
             'status' => CompanyStatus::from($companyData['status'])->value,
+            'legacy_ticket_enabled' => false,
         ]);
 
         return $company;
@@ -51,16 +53,18 @@ class CompanyService{
 
         $company = Company::find($companyData['companyId']);
 
-        $company->update([
+        $attributes = [
             'name' => $companyData['name'],
             'status' => CompanyStatus::from($companyData['status'])->value,
-        ]);
+        ];
+        if (array_key_exists('legacyTicketEnabled', $companyData)) {
+            $attributes['legacy_ticket_enabled'] = $companyData['legacyTicketEnabled'];
+        }
+        $company->update($attributes);
 
         return $company;
 
-
     }
-
 
     public function deleteCompany(int $companyId)
     {
@@ -68,6 +72,4 @@ class CompanyService{
         return Company::find($companyId)->delete();
 
     }
-
-
 }
