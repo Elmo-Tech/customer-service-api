@@ -28,6 +28,7 @@ class Ticket extends Model
         'branch_id',
         'closed_at',
         'real_closed_at',
+        'timeline_token',
         'tag_id'
     ];
 
@@ -70,6 +71,11 @@ class Ticket extends Model
     public function logs()
     {
         return $this->hasMany(TicketLog::class);
+    }
+
+    public function timelineLogs(): HasMany
+    {
+        return $this->hasMany(TicketTimelineLog::class);
     }
 
 

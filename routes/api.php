@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Private\Ticket\AdminTicketController;
 use App\Http\Controllers\Api\Private\Ticket\CustomerTicketController;
 use App\Http\Controllers\Api\Private\Ticket\TicketLogController;
 use App\Http\Controllers\Api\Private\Ticket\TicketPublicController;
+use App\Http\Controllers\Api\Private\Ticket\TicketTimelineController;
 use App\Http\Controllers\Api\Private\User\UserController;
 use App\Http\Controllers\Api\Public\Auth\AuthController;
 use App\Http\Controllers\Api\Public\Ticket\LegacyTicketOptionsController;
@@ -69,12 +70,16 @@ Route::prefix('v1/admin/customers')->group(function () {
 Route::prefix('v1/admin/tickets')->group(function () {
     Route::get('', [AdminTicketController::class, 'allTickets']);
     Route::get('edit', [AdminTicketController::class, 'edit']);
+    Route::get('timeline', [TicketTimelineController::class, 'timeline']);
+    Route::post('messages', [TicketTimelineController::class, 'storeAdminMessage']);
     Route::put('update', [AdminTicketController::class, 'update']);
     Route::delete('delete', [AdminTicketController::class, 'delete']);
 });
 
 Route::prefix('v1/tickets')->group(function () {
     Route::post('create', [CustomerTicketController::class, 'create']);
+    Route::get('timeline', [TicketTimelineController::class, 'customerTimeline']);
+    Route::post('messages', [TicketTimelineController::class, 'storeCustomerMessage']);
 });
 
 Route::prefix('v1/admin/roles')->group(function () {

@@ -101,7 +101,7 @@ class CustomerTicketController extends Controller
 
             $content = [
                 'subject' => $subject,
-                'body' => $ticket->description,
+                'body' => $ticket->description."<br><br><a href=\"".$this->timelineUrl($ticket)."\">Apri ticket</a>",
                 'attachments' => $attachments,
             ];
 
@@ -130,5 +130,10 @@ class CustomerTicketController extends Controller
             throw $e;
         }
 
+    }
+
+    private function timelineUrl($ticket): string
+    {
+        return 'http://tickets.testingelmo.com/tickets/timeline?ticketId='.$ticket->id.'&token='.$ticket->timeline_token;
     }
 }

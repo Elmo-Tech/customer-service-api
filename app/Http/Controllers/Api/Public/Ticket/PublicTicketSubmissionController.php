@@ -63,7 +63,7 @@ class PublicTicketSubmissionController extends Controller
         $content = [
             'subject' => "ticket: {$ticket->ticket_number} | {$importance[$ticket->importance]} | "
                 ."{$ticket->customer->getFullName()} | {$ticket->company->name}",
-            'body' => $ticket->description,
+            'body' => $ticket->description.'<br><br><a href="'.$this->timelineUrl($ticket).'">Apri ticket</a>',
             'attachments' => $attachments,
         ];
 
@@ -73,5 +73,10 @@ class PublicTicketSubmissionController extends Controller
         if ($ticket->customer->email) {
             Mail::to($ticket->customer->email)->send(new TicketDetails($content));
         }
+    }
+
+    private function timelineUrl(Ticket $ticket): string
+    {
+        return 'http://tickets.testingelmo.com/tickets/timeline?ticketId='.$ticket->id.'&token='.$ticket->timeline_token;
     }
 }

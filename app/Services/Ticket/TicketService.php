@@ -6,6 +6,9 @@ use App\Enums\Ticket\TicketImportanceStatus;
 use App\Enums\Ticket\TicketStatus;
 use App\Filters\Ticket\FilterTicket;
 use App\Models\Tiket\Ticket;
+use App\Models\Tiket\TicketTimelineLog;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
@@ -66,6 +69,7 @@ AllowedFilter::callback('toDate', function (Builder $query, $value) {
             'branch_id' => $ticketData['branchId'],
             'closed_at' => null,
             'tag_id' => $ticketData['tagId']??null,
+            'timeline_token' => (string) Str::uuid(),
             'real_closed_at' => TicketStatus::from($ticketData['status'])->value == 1 ? now():null
         ]);
 
@@ -82,15 +86,17 @@ AllowedFilter::callback('toDate', function (Builder $query, $value) {
     {
 
         $ticket = Ticket::find($ticketData['ticketId']);
+        $oldStatus = (int) $ticket->getRawOriginal('status');
+        $newStatus = TicketStatus::from($ticketData['status'])->value;
     
         $closedAt = $ticketData['closedAt']??null;
         
-        if(TicketStatus::from($ticketData['status'])->value == 1 && !isset($ticketData['closedAt'])){
+        if($newStatus == 1 && !isset($ticketData['closedAt'])){
             $closedAt = now();
         }
         $ticket->update([
             'company_id' => $ticketData['companyId'],
-            'status' => TicketStatus::from($ticketData['status'])->value,
+            'status' => $newStatus,
             'importance' => TicketImportanceStatus::from($ticketData['importance'])->value,
             'description' => $ticketData['description'],
             'customer_id' => $ticketData['customerId'],
@@ -100,6 +106,19 @@ AllowedFilter::callback('toDate', function (Builder $query, $value) {
             'tag_id' => $ticketData['tagId']??null,
             'real_closed_at' => TicketStatus::from($ticketData['status'])->value == 1 ? now():null
         ]);
+
+        if ($oldStatus !== $newStatus) {
+            $user = Auth::user();
+
+            $ticket->timelineLogs()->create([
+                'type' => TicketTimelineLog::TYPE_STATUS_CHANGE,
+                'actor_type' => TicketTimelineLog::ACTOR_ADMIN,
+                'user_id' => $user?->id,
+                'user_name' => $user?->name ?? 'Admin',
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]);
+        }
 
         return $ticket;
 
