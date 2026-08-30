@@ -165,6 +165,6 @@ class CustomerTicketController extends Controller
 
     private function timelineUrl($ticket): string
     {
-        return 'http://tickets.testingelmo.com/tickets/timeline?ticketId='.$ticket->id.'&token='.$ticket->timeline_token;
+        return 'http://tickets.testingelmo.com/tickets/timeline?ticketId='.$ticket->id.'&timelineToken='.$ticket->timeline_token;
     }
 }

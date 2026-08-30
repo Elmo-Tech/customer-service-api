@@ -46,10 +46,10 @@ When a ticket is created, the backend stores a permanent timeline token on the t
 The first ticket email sent to the customer includes a link like:
 
 ```text
-http://tickets.testingelmo.com/tickets/timeline?ticketId=123&token=TIMELINE_TOKEN
+http://tickets.testingelmo.com/tickets/timeline?ticketId=123&timelineToken=TIMELINE_TOKEN
 ```
 
-The frontend should read `ticketId` and `token` from the URL and use them when calling customer timeline APIs.
+The frontend should read `ticketId` and `timelineToken` from the URL and use them when calling customer timeline APIs.
 
 The customer does not type the token manually.
 
@@ -140,7 +140,7 @@ permission:edit_ticket
 ## Customer: Get Ticket Timeline
 
 ```http
-GET /api/v1/tickets/timeline?ticketId=123&token=TIMELINE_TOKEN&page=1&pageSize=10
+GET /api/v1/tickets/timeline?ticketId=123&timelineToken=TIMELINE_TOKEN&page=1&pageSize=10
 ```
 
 ### Purpose
@@ -155,7 +155,7 @@ The backend validates:
 
 ```text
 ticketId
-token
+timelineToken
 ```
 
 The token must match the ticket timeline token.
@@ -187,6 +187,74 @@ The response includes:
     "totalPages": 3
   }
 }
+```
+
+## Exact API Keys
+
+Use these keys exactly.
+
+### Timeline GET Query Params
+
+```text
+ticketId
+timelineToken
+page
+pageSize
+```
+
+`timelineToken` is required only for the customer endpoint.
+
+### Message Form-Data Fields
+
+```text
+ticketId
+timelineToken
+message
+attachments[]
+```
+
+`timelineToken` is required only for the customer endpoint.
+
+Use `attachments[]` as the Postman/form-data key for files. It is received by Laravel as the `attachments` array.
+
+### Customer Status JSON Body
+
+```text
+ticketId
+timelineToken
+status
+```
+
+### Timeline Response Keys
+
+```text
+result
+ticket
+ticketNumber
+createdAt
+closedAt
+customerName
+company
+priority
+status
+ticketMessages
+id
+type
+actorType
+userId
+userName
+message
+attachments
+fileName
+url
+oldStatus
+newStatus
+pagination
+total
+count
+perPage
+currentPage
+totalPages
 ```
 
 ## Admin: Send Message
@@ -251,7 +319,7 @@ Creates a message log as a customer actor.
 
 ### Auth
 
-No JWT is required for this endpoint. The frontend must send the `token` from the timeline URL.
+No JWT is required for this endpoint. The frontend must send the `timelineToken` from the timeline URL.
 
 ### Multipart Request
 
@@ -259,7 +327,7 @@ Use `multipart/form-data`:
 
 ```text
 ticketId=123
-token=TIMELINE_TOKEN
+timelineToken=TIMELINE_TOKEN
 message=Il problema persiste.
 attachments[]=screenshot.png
 attachments[]=report.pdf
@@ -288,15 +356,59 @@ attachments[]=report.pdf
 }
 ```
 
+## Customer: Update Ticket Status
+
+```http
+PUT /api/v1/tickets/status
+Content-Type: application/json
+```
+
+### Purpose
+
+Allows the customer to close or reopen the ticket using the timeline token from the email link.
+
+### Auth
+
+No JWT is required for this endpoint. The frontend must send the `timelineToken` from the timeline URL.
+
+### JSON Request
+
+```json
+{
+  "ticketId": 123,
+  "timelineToken": "TIMELINE_TOKEN",
+  "status": 3
+}
+```
+
+Allowed customer status values:
+
+| Value | Meaning |
+| --- | --- |
+| `1` | Close ticket |
+| `3` | Reopen ticket |
+
+### Response
+
+```json
+{
+  "message": "ticket status has been updated!"
+}
+```
+
 ## Status Change Logs
 
-The frontend does not call a separate endpoint to create status logs.
+The frontend does not call a separate endpoint to create status logs directly.
 
-Status-change logs are created automatically when the existing admin update endpoint changes the ticket status:
+Status-change logs are created automatically when either endpoint changes the ticket status:
 
 ```http
 PUT /api/v1/admin/tickets/update
 Authorization: Bearer ADMIN_JWT
+```
+
+```http
+PUT /api/v1/tickets/status
 ```
 
 If the old status and new status are equal, no status-change log is created.

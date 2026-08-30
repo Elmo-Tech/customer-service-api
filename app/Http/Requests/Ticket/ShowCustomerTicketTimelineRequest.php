@@ -17,7 +17,7 @@ class ShowCustomerTicketTimelineRequest extends FormRequest
     {
         return [
             'ticketId' => ['required', 'integer', 'exists:tickets,id'],
-            'token' => ['required', 'string'],
+            'timelineToken' => ['required', 'string'],
         ];
     }
 

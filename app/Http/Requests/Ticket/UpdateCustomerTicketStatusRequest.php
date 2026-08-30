@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Ticket;
 
+use App\Enums\Ticket\TicketStatus;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
-class StoreCustomerTicketTimelineMessageRequest extends FormRequest
+class UpdateCustomerTicketStatusRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,9 +20,10 @@ class StoreCustomerTicketTimelineMessageRequest extends FormRequest
         return [
             'ticketId' => ['required', 'integer', 'exists:tickets,id'],
             'timelineToken' => ['required', 'string'],
-            'message' => ['required', 'string'],
-            'attachments' => ['nullable', 'array'],
-            'attachments.*' => ['file'],
+            'status' => ['required', 'integer', Rule::in([
+                TicketStatus::DONE->value,
+                TicketStatus::REOPENED->value,
+            ])],
         ];
     }
 

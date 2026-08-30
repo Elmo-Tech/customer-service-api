@@ -74,7 +74,7 @@ class TicketTimelineApiTest extends TestCase
 
         $this->post('/api/v1/tickets/messages', [
             'ticketId' => $ticket->id,
-            'token' => $ticket->timeline_token,
+            'timelineToken' => $ticket->timeline_token,
             'message' => 'Still seeing the same issue.',
             'attachments' => [
                 UploadedFile::fake()->create('error.png', 12, 'image/png'),
@@ -99,7 +99,7 @@ class TicketTimelineApiTest extends TestCase
             'mime_type' => 'image/png',
         ]);
 
-        $this->getJson("/api/v1/tickets/timeline?ticketId={$ticket->id}&token={$ticket->timeline_token}")
+        $this->getJson("/api/v1/tickets/timeline?ticketId={$ticket->id}&timelineToken={$ticket->timeline_token}")
             ->assertOk()
             ->assertJsonPath('result.ticket.ticketNumber', $ticket->ticket_number)
             ->assertJsonPath('result.ticketMessages.0.type', TicketTimelineLog::TYPE_MESSAGE)
@@ -144,6 +144,43 @@ class TicketTimelineApiTest extends TestCase
         ]);
     }
 
+    public function test_customer_can_close_or_reopen_ticket_with_timeline_token(): void
+    {
+        $ticket = $this->ticket([
+            'status' => TicketStatus::DONE->value,
+            'closed_at' => now(),
+            'real_closed_at' => now(),
+        ]);
+
+        $this->putJson('/api/v1/tickets/status', [
+            'ticketId' => $ticket->id,
+            'timelineToken' => $ticket->timeline_token,
+            'status' => TicketStatus::REOPENED->value,
+        ])->assertOk();
+
+        $ticket->refresh();
+
+        $this->assertSame(TicketStatus::REOPENED->value, $ticket->status);
+        $this->assertNull($ticket->closed_at);
+        $this->assertNull($ticket->real_closed_at);
+
+        $this->assertDatabaseHas('ticket_timeline_logs', [
+            'ticket_id' => $ticket->id,
+            'type' => TicketTimelineLog::TYPE_STATUS_CHANGE,
+            'actor_type' => TicketTimelineLog::ACTOR_CUSTOMER,
+            'old_status' => TicketStatus::DONE->value,
+            'new_status' => TicketStatus::REOPENED->value,
+        ]);
+
+        $this->putJson('/api/v1/tickets/status', [
+            'ticketId' => $ticket->id,
+            'timelineToken' => $ticket->timeline_token,
+            'status' => TicketStatus::REOPENED->value,
+        ])->assertOk();
+
+        $this->assertSame(1, TicketTimelineLog::where('ticket_id', $ticket->id)->count());
+    }
+
     private function updatePayload(Ticket $ticket, int $status): array
     {
         return [
@@ -157,12 +194,12 @@ class TicketTimelineApiTest extends TestCase
         ];
     }
 
-    private function ticket(): Ticket
+    private function ticket(array $overrides = []): Ticket
     {
         $customer = $this->customer();
         $branch = $customer->company->branches()->first();
 
-        return Ticket::create([
+        return Ticket::create(array_merge([
             'company_id' => $customer->company_id,
             'branch_id' => $branch->id,
             'customer_id' => $customer->id,
@@ -170,7 +207,7 @@ class TicketTimelineApiTest extends TestCase
             'importance' => TicketImportanceStatus::GREEN->value,
             'description' => 'Printer issue',
             'timeline_token' => 'timeline-token',
-        ]);
+        ], $overrides));
     }
 
     private function customer(): Customer

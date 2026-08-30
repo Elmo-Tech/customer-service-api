@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api\Private\Ticket;
 
+use App\Enums\Ticket\TicketStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ticket\ShowCustomerTicketTimelineRequest;
 use App\Http\Requests\Ticket\StoreCustomerTicketTimelineMessageRequest;
 use App\Http\Requests\Ticket\StoreTicketTimelineMessageRequest;
+use App\Http\Requests\Ticket\UpdateCustomerTicketStatusRequest;
 use App\Http\Resources\Ticket\TicketTimelineLogResource;
 use App\Http\Resources\Ticket\TicketTimelineResource;
 use App\Models\Tiket\Ticket;
@@ -41,7 +43,7 @@ class TicketTimelineController extends Controller
 
     public function customerTimeline(ShowCustomerTicketTimelineRequest $request): JsonResponse
     {
-        $ticket = $this->findCustomerTimelineTicket($request->integer('ticketId'), $request->input('token'));
+        $ticket = $this->findCustomerTimelineTicket($request->integer('ticketId'), $request->input('timelineToken'));
         $logs = $this->timelineLogs($ticket, $request);
 
         return response()->json(new TicketTimelineResource($ticket, $logs), 200);
@@ -70,7 +72,7 @@ class TicketTimelineController extends Controller
 
     public function storeCustomerMessage(StoreCustomerTicketTimelineMessageRequest $request): JsonResponse
     {
-        $ticket = $this->findCustomerTimelineTicket($request->integer('ticketId'), $request->input('token'));
+        $ticket = $this->findCustomerTimelineTicket($request->integer('ticketId'), $request->input('timelineToken'));
         $customer = $ticket->customer;
 
         $log = DB::transaction(function () use ($request, $ticket, $customer): TicketTimelineLog {
@@ -87,6 +89,46 @@ class TicketTimelineController extends Controller
         return response()->json([
             'data' => new TicketTimelineLogResource($log),
         ], 201);
+    }
+
+    public function updateCustomerStatus(UpdateCustomerTicketStatusRequest $request): JsonResponse
+    {
+        $ticket = $this->findCustomerTimelineTicket($request->integer('ticketId'), $request->input('timelineToken'));
+        $customer = $ticket->customer;
+        $oldStatus = (int) $ticket->getRawOriginal('status');
+        $newStatus = (int) $request->integer('status');
+
+        DB::transaction(function () use ($ticket, $customer, $oldStatus, $newStatus): void {
+            if ($oldStatus === $newStatus) {
+                return;
+            }
+
+            if ($newStatus === TicketStatus::DONE->value) {
+                $ticket->closed_at = $ticket->closed_at ?? now();
+                $ticket->real_closed_at = now();
+            }
+
+            if ($newStatus === TicketStatus::REOPENED->value) {
+                $ticket->closed_at = null;
+                $ticket->real_closed_at = null;
+            }
+
+            $ticket->status = $newStatus;
+            $ticket->save();
+
+            $ticket->timelineLogs()->create([
+                'type' => TicketTimelineLog::TYPE_STATUS_CHANGE,
+                'actor_type' => TicketTimelineLog::ACTOR_CUSTOMER,
+                'user_id' => $customer?->id,
+                'user_name' => $customer?->getFullName() ?? 'Customer',
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]);
+        });
+
+        return response()->json([
+            'message' => 'ticket status has been updated!',
+        ], 200);
     }
 
     private function createMessageLog(Ticket $ticket, int $actorType, ?int $userId, string $userName, string $message, array $files): TicketTimelineLog

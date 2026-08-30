@@ -84,7 +84,7 @@ class PublicTicketSubmissionController extends Controller
 
     private function timelineUrl(Ticket $ticket): string
     {
-        return 'http://tickets.testingelmo.com/tickets/timeline?ticketId='.$ticket->id.'&token='.$ticket->timeline_token;
+        return 'http://tickets.testingelmo.com/tickets/timeline?ticketId='.$ticket->id.'&timelineToken='.$ticket->timeline_token;
     }
 
     private function createInitialTimelineMessage(Ticket $ticket, array $uploadedAttachments): void

@@ -80,6 +80,7 @@ Route::prefix('v1/tickets')->group(function () {
     Route::post('create', [CustomerTicketController::class, 'create']);
     Route::get('timeline', [TicketTimelineController::class, 'customerTimeline']);
     Route::post('messages', [TicketTimelineController::class, 'storeCustomerMessage']);
+    Route::put('status', [TicketTimelineController::class, 'updateCustomerStatus']);
 });
 
 Route::prefix('v1/admin/roles')->group(function () {
