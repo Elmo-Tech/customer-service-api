@@ -107,6 +107,43 @@ class TicketTimelineApiTest extends TestCase
             ->assertJsonPath('pagination.total', 1);
     }
 
+    public function test_customer_ticket_create_adds_initial_timeline_message(): void
+    {
+        Mail::fake();
+        Storage::fake('public');
+
+        $customer = $this->customer();
+
+        $this->post('/api/v1/tickets/create', [
+            'status' => TicketStatus::OPENED->value,
+            'importance' => TicketImportanceStatus::GREEN->value,
+            'description' => 'Initial printer issue',
+            'customerId' => $customer->id,
+            'pin' => '1234',
+            'companyId' => $customer->company_id,
+            'branchId' => $customer->company->branches()->first()->id,
+            'attachments' => [
+                UploadedFile::fake()->create('initial.png', 10, 'image/png'),
+            ],
+        ])->assertOk();
+
+        $ticket = Ticket::query()->latest('id')->first();
+
+        $this->assertDatabaseHas('ticket_timeline_logs', [
+            'ticket_id' => $ticket->id,
+            'type' => TicketTimelineLog::TYPE_MESSAGE,
+            'actor_type' => TicketTimelineLog::ACTOR_CUSTOMER,
+            'user_id' => $customer->id,
+            'user_name' => $customer->getFullName(),
+            'message' => 'Initial printer issue',
+        ]);
+
+        $this->assertDatabaseHas('ticket_timeline_log_attachments', [
+            'file_name' => 'initial.png',
+            'mime_type' => 'image/png',
+        ]);
+    }
+
     private function updatePayload(Ticket $ticket, int $status): array
     {
         return [

@@ -55,6 +55,21 @@ The customer does not type the token manually.
 
 This token is separate from the old close/review token. The old token is still used only by the existing review flow.
 
+## Initial Ticket Message
+
+When the customer creates a ticket, the backend automatically creates the first timeline message.
+
+The first message uses:
+
+```text
+type=1
+actorType=2
+message=ticket description
+attachments=ticket creation attachments
+```
+
+The frontend should display this initial message inside `ticketMessages` like any other customer message.
+
 ## Admin: Get Ticket Timeline
 
 ```http

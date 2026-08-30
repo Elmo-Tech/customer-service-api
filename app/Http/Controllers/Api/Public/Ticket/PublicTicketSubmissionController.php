@@ -7,6 +7,7 @@ use App\Http\Requests\Ticket\CreatePublicTicketRequest;
 use App\Http\Requests\Ticket\IdentifyPublicTicketRequesterRequest;
 use App\Mail\TicketDetails;
 use App\Models\Tiket\Ticket;
+use App\Models\Tiket\TicketTimelineLog;
 use App\Services\Ticket\PublicTicketSubmissionService;
 use App\Services\Upload\UploadService;
 use Illuminate\Http\JsonResponse;
@@ -42,13 +43,19 @@ class PublicTicketSubmissionController extends Controller
             $fields = $request->validated();
             $ticket = $this->submission->create($fields['ticketToken'], $fields);
             $attachments = [];
+            $uploadedAttachments = [];
 
             foreach ($fields['attachments'] ?? [] as $uploadedFile) {
                 $path = $this->uploads->uploadFile($uploadedFile, "tickets/{$ticket->id}");
                 $attachments[] = $path;
+                $uploadedAttachments[] = [
+                    'file' => $uploadedFile,
+                    'path' => $path,
+                ];
                 $ticket->attachments()->create(['path' => $path]);
             }
 
+            $this->createInitialTimelineMessage($ticket, $uploadedAttachments);
             $this->sendNotifications($ticket, $attachments);
         });
 
@@ -78,5 +85,29 @@ class PublicTicketSubmissionController extends Controller
     private function timelineUrl(Ticket $ticket): string
     {
         return 'http://tickets.testingelmo.com/tickets/timeline?ticketId='.$ticket->id.'&token='.$ticket->timeline_token;
+    }
+
+    private function createInitialTimelineMessage(Ticket $ticket, array $uploadedAttachments): void
+    {
+        $ticket->loadMissing('customer');
+
+        $log = $ticket->timelineLogs()->create([
+            'type' => TicketTimelineLog::TYPE_MESSAGE,
+            'actor_type' => TicketTimelineLog::ACTOR_CUSTOMER,
+            'user_id' => $ticket->customer_id,
+            'user_name' => $ticket->customer?->getFullName() ?? 'Customer',
+            'message' => $ticket->description,
+        ]);
+
+        foreach ($uploadedAttachments as $attachment) {
+            $file = $attachment['file'];
+
+            $log->attachments()->create([
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $attachment['path'],
+                'file_size' => $file->getSize(),
+                'mime_type' => $file->getClientMimeType(),
+            ]);
+        }
     }
 }

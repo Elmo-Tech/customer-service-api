@@ -12,6 +12,8 @@ use App\Mail\TicketDetails;
 use App\Models\Company\Branch;
 use App\Models\Company\Company;
 use App\Models\Company\Customer;
+use App\Models\Tiket\Ticket;
+use App\Models\Tiket\TicketTimelineLog;
 use App\Services\Ticket\TicketService;
 use App\Services\Upload\UploadService;
 use Illuminate\Support\Facades\Auth;
@@ -76,16 +78,23 @@ class CustomerTicketController extends Controller
 
             $ticketAttachments = $ticketData['attachments'] ?? [];
             $attachments = [];
+            $uploadedAttachments = [];
 
             foreach ($ticketAttachments as $key => $attachmentData) {
 
                 $attachment = $this->uploadService->uploadFile($attachmentData, "tickets/$ticket->id");
                 $attachments[] = $attachment;
+                $uploadedAttachments[] = [
+                    'file' => $attachmentData,
+                    'path' => $attachment,
+                ];
 
                 $ticket->attachments()->create([
                     'path' => $attachment,
                 ]);
             }
+
+            $this->createInitialTimelineMessage($ticket, $cutomerAuth, $uploadedAttachments);
 
             $importance = [
                 '0' => 'Verde',
@@ -130,6 +139,28 @@ class CustomerTicketController extends Controller
             throw $e;
         }
 
+    }
+
+    private function createInitialTimelineMessage(Ticket $ticket, Customer $customer, array $uploadedAttachments): void
+    {
+        $log = $ticket->timelineLogs()->create([
+            'type' => TicketTimelineLog::TYPE_MESSAGE,
+            'actor_type' => TicketTimelineLog::ACTOR_CUSTOMER,
+            'user_id' => $customer->id,
+            'user_name' => $customer->getFullName(),
+            'message' => $ticket->description,
+        ]);
+
+        foreach ($uploadedAttachments as $attachment) {
+            $file = $attachment['file'];
+
+            $log->attachments()->create([
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $attachment['path'],
+                'file_size' => $file->getSize(),
+                'mime_type' => $file->getClientMimeType(),
+            ]);
+        }
     }
 
     private function timelineUrl($ticket): string
