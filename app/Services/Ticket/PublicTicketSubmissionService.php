@@ -18,7 +18,10 @@ class PublicTicketSubmissionService
 {
     private const TOKEN_LIFETIME_MINUTES = 15;
 
-    public function __construct(private readonly TicketService $tickets) {}
+    public function __construct(
+        private readonly TicketService $tickets,
+        private readonly CustomerTicketDashboardService $dashboard,
+    ) {}
 
     public function identify(string $username, string $pin): array
     {
@@ -37,6 +40,7 @@ class PublicTicketSubmissionService
         return [
             'name' => $customer->getFullName(),
             'ticketToken' => $this->token($customer, $branchId),
+            'token' => $this->dashboard->token($customer),
             'tags' => parameterValue::query()
                 ->where('parameter_id', 1)
                 ->get(['id as value', 'parameter_value as label'])

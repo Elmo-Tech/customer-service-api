@@ -67,6 +67,8 @@ class PublicTicketSubmissionTest extends TestCase
             ->assertJsonPath('data.name', 'Mario Rossi');
 
         $this->assertIsString($response->json('data.ticketToken'));
+        $this->assertIsString($response->json('data.token'));
+        $this->assertNotSame($response->json('data.ticketToken'), $response->json('data.token'));
         $this->assertArrayNotHasKey('companyId', $response->json('data'));
         $this->assertArrayNotHasKey('customerId', $response->json('data'));
         $this->assertArrayNotHasKey('branchId', $response->json('data'));

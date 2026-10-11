@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Private\Ticket\TicketPublicController;
 use App\Http\Controllers\Api\Private\Ticket\TicketTimelineController;
 use App\Http\Controllers\Api\Private\User\UserController;
 use App\Http\Controllers\Api\Public\Auth\AuthController;
+use App\Http\Controllers\Api\Public\Ticket\CustomerTicketDashboardController;
 use App\Http\Controllers\Api\Public\Ticket\LegacyTicketOptionsController;
 use App\Http\Controllers\Api\Public\Ticket\PublicTicketSubmissionController;
 use Illuminate\Support\Facades\Route;
@@ -96,6 +97,11 @@ Route::prefix('v1/selects')->group(function () {
 });
 
 Route::get('v1/public/ticket', [TicketPublicController::class, 'show']);
+Route::prefix('v1/customer/tickets')->group(function () {
+    Route::get('', [CustomerTicketDashboardController::class, 'index']);
+    Route::get('show', [CustomerTicketDashboardController::class, 'show']);
+});
+
 Route::post('v1/public/tickets/identify', [PublicTicketSubmissionController::class, 'identify'])
     ->middleware('throttle:public-ticket-identify');
 Route::post('v1/public/tickets/create', [PublicTicketSubmissionController::class, 'create'])
