@@ -31,7 +31,16 @@ Keep the PIN as a string. Save `data.token` for the dashboard; `ticketToken` rem
 
 `GET /customer/tickets?token=CUSTOMER_TOKEN&page=1&pageSize=10`
 
-Only the identified customer's tickets are returned, newest first. No filters. `page` defaults to `1`; `pageSize` defaults to `10` (allowed: `1` to `100`).
+Only the identified customer's tickets are returned, newest first. `page` defaults to `1`; `pageSize` defaults to `10` (allowed: `1` to `100`).
+
+Optional query parameters (can be combined):
+
+- `filter[status]`: `0` opened + reopened (same as admin), `1` closed, `2` in progress, `3` reopened only.
+- `filter[description]`: contains search using `LIKE %value%`. Send the text without adding `%`.
+
+Example: `GET /customer/tickets?token=CUSTOMER_TOKEN&filter[status]=1&filter[description]=printer&page=1&pageSize=10`
+
+Omit a filter or send an empty value to disable it. Both filters use AND and apply before pagination, within the customer's tickets only. Reset `page` to `1` when changing filters. Invalid filter values return `422`.
 
 Response `200`:
 

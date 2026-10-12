@@ -17,7 +17,10 @@ class CustomerTicketDashboardController extends Controller
 
     public function index(IndexCustomerTicketsRequest $request): JsonResponse
     {
-        $tickets = $this->dashboard->allTickets($request->validated('token'));
+        $tickets = $this->dashboard->allTickets(
+            $request->validated('token'),
+            $request->validated('filter', []),
+        );
 
         return response()->json(new CustomerTicketCollection(
             PaginateCollection::paginate($tickets, $request->integer('pageSize', 10)),

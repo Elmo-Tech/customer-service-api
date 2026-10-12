@@ -4,6 +4,7 @@ namespace App\Services\Ticket;
 
 use App\Enums\Company\CompanyStatus;
 use App\Enums\Company\CustomerStatus;
+use App\Enums\Ticket\TicketStatus;
 use App\Models\Company\Customer;
 use App\Models\Tiket\Ticket;
 use Illuminate\Contracts\Encryption\DecryptException;
@@ -25,13 +26,26 @@ class CustomerTicketDashboardService
         ], JSON_THROW_ON_ERROR));
     }
 
-    public function allTickets(string $token): Collection
+    public function allTickets(string $token, array $filters = []): Collection
     {
         $customer = $this->customerFromToken($token);
 
-        return Ticket::query()
+        $query = Ticket::query()
             ->where('customer_id', $customer->id)
-            ->with(['customer', 'company', 'branch'])
+            ->with(['customer', 'company', 'branch']);
+
+        if (isset($filters['status'])) {
+            $status = (int) $filters['status'];
+            $query->whereIn('status', $status === TicketStatus::OPENED->value
+                ? [TicketStatus::OPENED->value, TicketStatus::REOPENED->value]
+                : [$status]);
+        }
+
+        if (isset($filters['description']) && $filters['description'] !== '') {
+            $query->where('description', 'like', '%'.$filters['description'].'%');
+        }
+
+        return $query
             ->orderByDesc('id')
             ->get();
     }

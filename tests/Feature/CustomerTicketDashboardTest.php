@@ -189,6 +189,87 @@ class CustomerTicketDashboardTest extends TestCase
         }
     }
 
+    public function test_status_filter_matches_admin_status_semantics(): void
+    {
+        $token = $this->identify()['token'];
+        $tickets = [];
+        foreach ([0, 1, 2, 3] as $status) {
+            $tickets[$status] = $this->ticket($this->customer);
+            $tickets[$status]->update(['status' => $status]);
+            $this->ticket($this->otherCustomer)->update(['status' => $status]);
+        }
+
+        foreach ([0 => [3, 0], 1 => [1], 2 => [2], 3 => [3]] as $status => $expected) {
+            $response = $this->getJson('/api/v1/customer/tickets?'.http_build_query([
+                'token' => $token,
+                'filter' => ['status' => (string) $status],
+            ]))->assertOk()->assertJsonPath('pagination.total', count($expected));
+
+            $this->assertSame(
+                array_map(fn ($value) => $tickets[$value]->id, $expected),
+                array_column($response->json('result.tickets'), 'ticketId'),
+            );
+        }
+    }
+
+    public function test_description_filter_combines_with_status_before_pagination(): void
+    {
+        $token = $this->identify()['token'];
+        $older = $this->ticket($this->customer);
+        $older->update(['description' => 'Office printer is broken', 'status' => 1]);
+        $newer = $this->ticket($this->customer);
+        $newer->update(['description' => 'The printer needs ink', 'status' => 1]);
+        $this->ticket($this->customer)->update(['description' => 'Another printer issue', 'status' => 2]);
+        $this->ticket($this->customer)->update(['description' => 'Network issue', 'status' => 1]);
+        $this->ticket($this->otherCustomer)->update(['description' => 'Office printer is broken', 'status' => 1]);
+        $query = ['token' => $token, 'filter' => ['description' => 'printer']];
+
+        $this->getJson('/api/v1/customer/tickets?'.http_build_query($query))
+            ->assertOk()->assertJsonPath('pagination.total', 3);
+
+        $query['filter']['status'] = '1';
+        $query['pageSize'] = 1;
+        $this->getJson('/api/v1/customer/tickets?'.http_build_query($query))
+            ->assertOk()->assertJsonPath('pagination.total', 2)
+            ->assertJsonPath('pagination.totalPages', 2)
+            ->assertJsonCount(1, 'result.tickets')
+            ->assertJsonPath('result.tickets.0.ticketId', $newer->id);
+        $this->getJson('/api/v1/customer/tickets?'.http_build_query([...$query, 'page' => 2]))
+            ->assertOk()->assertJsonPath('result.tickets.0.ticketId', $older->id);
+    }
+
+    public function test_empty_filters_zero_description_and_quoted_text(): void
+    {
+        $token = $this->identify()['token'];
+        $ticket = $this->ticket($this->customer);
+        $ticket->update(['description' => "Printer's error 0", 'status' => 1]);
+        $this->ticket($this->customer)->update(['description' => 'Different issue']);
+
+        $this->getJson('/api/v1/customer/tickets?'.http_build_query([
+            'token' => $token, 'filter' => ['status' => '', 'description' => ''],
+        ]))->assertOk()->assertJsonPath('pagination.total', 2);
+
+        foreach (["Printer's", '0'] as $description) {
+            $this->getJson('/api/v1/customer/tickets?'.http_build_query([
+                'token' => $token, 'filter' => ['description' => $description],
+            ]))->assertOk()->assertJsonPath('pagination.total', 1)
+                ->assertJsonPath('result.tickets.0.ticketId', $ticket->id);
+        }
+
+        $this->getJson('/api/v1/customer/tickets?'.http_build_query([
+            'token' => $token, 'filter' => ['description' => "' OR 1=1 --"],
+        ]))->assertOk()->assertJsonPath('result.tickets', [])->assertJsonPath('pagination.total', 0);
+    }
+
+    public function test_invalid_filters_are_rejected(): void
+    {
+        $token = $this->identify()['token'];
+        foreach ([['status' => '4'], ['status' => 'open'], ['status' => ['1']], ['description' => ['printer']]] as $filter) {
+            $this->getJson('/api/v1/customer/tickets?'.http_build_query(compact('token', 'filter')))
+                ->assertUnprocessable()->assertJsonValidationErrors('filter.'.array_key_first($filter));
+        }
+    }
+
     private function identify(): array
     {
         return $this->postJson('/api/v1/public/tickets/identify', [
