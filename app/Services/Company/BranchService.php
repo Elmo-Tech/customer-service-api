@@ -4,70 +4,53 @@ namespace App\Services\Company;
 
 use App\Enums\Company\BranchStatus;
 use App\Models\Company\Branch;
-use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\QueryBuilder;
+use App\Models\Company\Company;
+use Illuminate\Support\Facades\DB;
 
-class BranchService{
-
-    private $branch;
-    public function __construct(Branch $branch)
+class BranchService
+{
+    public function createBranch(array $data): Branch
     {
-        $this->branch = $branch;
+        return DB::transaction(function () use ($data) {
+            $company = Company::whereKey($data['companyId'])->lockForUpdate()->firstOrFail();
+
+            return $company->branches()->create([
+                'name' => $data['name'],
+                'status' => BranchStatus::from($data['status'])->value,
+            ]);
+        });
     }
 
-    /*public function allCountries()
+    public function editBranch(int $branchId): Branch
     {
-        $user = QueryBuilder::for(Branch::class)
-            ->allowedFilters([
-                AllowedFilter::custom('search', new FilterBranch()), // Add a custom search filter
-                AllowedFilter::exact('status'),
-            ])->get();
-
-        return $user;
-
-    }*/
-
-    public function createBranch(array $branchData): Branch
-    {
-
-        $branch = Branch::create([
-            'name' => $branchData['name'],
-            'status' => BranchStatus::from($branchData['status'])->value,
-            'company_id' => $branchData['companyId']
-        ]);
-
-        return $branch;
-
+        return Branch::whereHas('company')->findOrFail($branchId);
     }
 
-    public function editBranch(int $branchId)
+    public function updateBranch(array $data): Branch
     {
-        return Branch::find($branchId);
+        return DB::transaction(function () use ($data) {
+            $branch = $this->lockBranch($data['branchId']);
+            $branch->update([
+                'name' => $data['name'],
+                'status' => BranchStatus::from($data['status'])->value,
+            ]);
+
+            return $branch;
+        });
     }
 
-    public function updateBranch(array $branchData): Branch
+    public function deleteBranch(int $branchId): void
     {
-
-        $branch = Branch::find($branchData['branchId']);
-
-        $branch->update([
-            'name' => $branchData['name'],
-            'status' => BranchStatus::from($branchData['status'])->value,
-            'company_id' => $branchData['companyId']
-        ]);
-
-        return $branch;
-
-
+        DB::transaction(function () use ($branchId) {
+            $this->lockBranch($branchId)->delete();
+        });
     }
 
-
-    public function deleteBranch(int $branchId)
+    private function lockBranch(int $branchId): Branch
     {
+        $branch = $this->editBranch($branchId);
+        Company::whereKey($branch->company_id)->lockForUpdate()->firstOrFail();
 
-        return Branch::find($branchId)->delete();
-
+        return Branch::whereKey($branchId)->lockForUpdate()->firstOrFail();
     }
-
-
 }

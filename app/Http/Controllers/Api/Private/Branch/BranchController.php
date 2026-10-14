@@ -54,7 +54,7 @@ class BranchController extends Controller
 
     public function edit(Request $request)
     {
-        //dd($request->branchId);
+        $request->validate(['branchId' => ['required', 'integer', 'min:1']]);
         $Branch  =  $this->branchService->editBranch($request->branchId);
 
         return response()->json(
@@ -90,10 +90,11 @@ class BranchController extends Controller
      */
     public function delete(Request $request)
     {
+        $request->validate(['branchId' => ['required', 'integer', 'min:1']]);
 
         try {
             DB::beginTransaction();
-            $this->branchService->deleteBranch($request->BranchId);
+            $this->branchService->deleteBranch($request->branchId);
             DB::commit();
             return response()->json([
                 'message' => 'تم حذف الفرع بنجاح!'

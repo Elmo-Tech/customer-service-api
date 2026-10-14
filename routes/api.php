@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Private\Branch\BranchController;
 use App\Http\Controllers\Api\Private\Company\CompanyController;
+use App\Http\Controllers\Api\Private\Company\CompanyContractController;
 use App\Http\Controllers\Api\Private\Customer\CustomerController;
 use App\Http\Controllers\Api\Private\Role\RoleController;
 use App\Http\Controllers\Api\Private\Select\SelectController;
@@ -48,6 +49,7 @@ Route::prefix('v1/admin/companies')->group(function () {
     Route::get('', [CompanyController::class, 'allCompanies']);
     Route::post('create', [CompanyController::class, 'create']);
     Route::get('edit', [CompanyController::class, 'edit']);
+    Route::get('show', [CompanyController::class, 'edit']);
     Route::put('update', [CompanyController::class, 'update']);
     Route::delete('delete', [CompanyController::class, 'delete']);
 
@@ -58,6 +60,15 @@ Route::prefix('v1/admin/branches')->group(function () {
     Route::get('edit', [BranchController::class, 'edit']);
     Route::put('update', [BranchController::class, 'update']);
     Route::delete('delete', [BranchController::class, 'delete']);
+});
+
+Route::prefix('v1/admin/company-contracts')->group(function () {
+    Route::get('', [CompanyContractController::class, 'index']);
+    Route::get('show', [CompanyContractController::class, 'show']);
+    Route::post('create', [CompanyContractController::class, 'create']);
+    Route::put('update', [CompanyContractController::class, 'update']);
+    Route::post('renew', [CompanyContractController::class, 'renew']);
+    Route::delete('delete', [CompanyContractController::class, 'delete']);
 });
 
 Route::prefix('v1/admin/customers')->group(function () {

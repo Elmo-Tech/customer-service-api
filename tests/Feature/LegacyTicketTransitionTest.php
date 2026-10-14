@@ -13,6 +13,7 @@ use App\Models\Company\Customer;
 use App\Models\User;
 use App\Services\Company\CompanyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -33,6 +34,12 @@ class LegacyTicketTransitionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // Exercise the unchanged MySQL CONCAT query using the SQLite test database.
+            DB::connection()->getPdo()->sqliteCreateFunction('CONCAT', static function (...$parts) {
+                return in_array(null, $parts, true) ? null : implode('', $parts);
+            });
+        }
         Mail::fake();
         User::create([
             'id' => 1,
@@ -92,7 +99,7 @@ class LegacyTicketTransitionTest extends TestCase
         $this->assertDatabaseCount('tickets', 1);
     }
 
-    public function test_new_companies_default_to_legacy_disabled_and_can_be_enabled_later(): void
+    public function test_new_companies_default_to_legacy_disabled_and_updates_preserve_it(): void
     {
         $company = app(CompanyService::class)->createCompany([
             'name' => 'Created Later',
@@ -107,7 +114,7 @@ class LegacyTicketTransitionTest extends TestCase
             'status' => CompanyStatus::ACTIVE->value,
             'legacyTicketEnabled' => true,
         ]);
-        $this->assertTrue($updated->legacy_ticket_enabled);
+        $this->assertFalse((bool) $updated->legacy_ticket_enabled);
     }
 
     private function company(string $name, bool $legacyEnabled): Company

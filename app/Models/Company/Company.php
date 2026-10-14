@@ -7,6 +7,7 @@ use App\Traits\CreatedUpdatedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Company extends Model
@@ -27,5 +28,23 @@ class Company extends Model
     public function branches(): HasMany
     {
         return $this->hasMany(Branch::class);
+    }
+
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(CompanyContract::class);
+    }
+
+    public function activeContract(): HasOne
+    {
+        return $this->hasOne(CompanyContract::class)->ofMany(
+            ['created_at' => 'max', 'id' => 'max'],
+            fn ($query) => $query->active(),
+        );
+    }
+
+    public function latestContract(): HasOne
+    {
+        return $this->hasOne(CompanyContract::class)->ofMany(['created_at' => 'max', 'id' => 'max']);
     }
 }

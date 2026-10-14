@@ -62,6 +62,8 @@ class RolesAndPermissionsSeeder extends Seeder
         }
 
 
+        $this->call(CompanyContractPermissionsSeeder::class);
+
         // roles
         $superAdmin = Role::create(['name' => 'مدير']);
         $superAdmin->givePermissionTo(Permission::all());

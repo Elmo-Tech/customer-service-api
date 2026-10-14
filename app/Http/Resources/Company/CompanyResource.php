@@ -18,7 +18,8 @@ class CompanyResource extends JsonResource
             'companyId' => $this->id,
             'name' => $this->name,
             'status' => $this->status,
-            'legacyTicketEnabled' => $this->legacy_ticket_enabled,
+            'currentContract' => ($contract = $this->activeContract ?? $this->latestContract)
+                ? new CompanyContractResource($contract) : null,
         ];
     }
 }

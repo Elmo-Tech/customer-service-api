@@ -4,40 +4,29 @@ namespace App\Http\Requests\Company;
 
 use App\Enums\Company\CompanyStatus;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\Rules\Enum;
-
 
 class CreateCompanyRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array|string>
-     */
     public function rules(): array
     {
         return [
-            'name' =>['required', "unique:companies,name"],
+            'name' => ['required', 'string', 'max:255', 'unique:companies,name'],
             'status' => ['required', new Enum(CompanyStatus::class)],
-            'branches' => ''
+            'customer' => ['required', 'array:firstname,lastname,username,email,pin'],
+            'customer.firstname' => ['required', 'string', 'max:255'],
+            'customer.lastname' => ['required', 'string', 'max:255'],
+            'customer.username' => ['required', 'string', 'max:255', 'unique:customers,username'],
+            'customer.email' => ['nullable', 'email', 'max:255'],
+            'customer.pin' => ['required', 'string', 'max:255'],
+            'contract' => ['sometimes', 'array:startDate,endDate', 'min:2'],
+            'contract.startDate' => ['required_with:contract', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'contract.endDate' => ['required_with:contract', 'date_format:Y-m-d', 'after_or_equal:contract.startDate'],
         ];
     }
-
-    public function failedValidation(Validator $validator)
-    {
-        throw new HttpResponseException(response()->json([
-            'message' => $validator->errors()
-        ], 401));
-    }
-
 }
