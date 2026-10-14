@@ -117,9 +117,9 @@ Response 200:
 }
 ```
 
-`GET /companies/show?companyId=4` and the retained `GET /companies/edit?companyId=4` require companyId.
-Both return the single company object shown inside the array above, with no wrapper.
-Neither includes branches or customer credentials.
+`GET /companies/edit?companyId=4` is the only company details endpoint and requires companyId and the `edit_company` permission.
+It returns the single company object shown inside the array above, including currentContract, with no wrapper.
+It does not include branches or customer credentials. Use it to populate the edit form; saving changes requires `PUT /companies/update` and `update_company`.
 
 ## Company Update and Delete
 

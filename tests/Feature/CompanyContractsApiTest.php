@@ -121,7 +121,7 @@ class CompanyContractsApiTest extends TestCase
         $company = $this->company();
         $active = $this->contract($company, '2026-10-01', '2026-10-31');
         $this->contract($company, '2026-09-01', '2026-09-30');
-        $this->getJson("/api/v1/admin/companies/show?companyId={$company->id}")
+        $this->getJson("/api/v1/admin/companies/edit?companyId={$company->id}")
             ->assertOk()->assertJsonPath('currentContract.contractId', $active->id);
     }
 
@@ -174,7 +174,7 @@ class CompanyContractsApiTest extends TestCase
         $this->assertSame('Recovered', $company->branches()->first()->name);
     }
 
-    public function test_company_index_and_show_use_exact_keys_filters_and_pagination(): void
+    public function test_company_index_and_edit_use_exact_keys_filters_and_pagination(): void
     {
         $company = $this->company();
         $old = $this->contract($company, '2026-09-01', '2026-09-30');
@@ -188,23 +188,41 @@ class CompanyContractsApiTest extends TestCase
                 ]]],
                 'pagination' => ['total' => 1, 'count' => 1, 'perPage' => 1, 'currentPage' => 1, 'totalPages' => 1],
             ]);
-        foreach (['edit', 'show'] as $route) {
-            $this->getJson("/api/v1/admin/companies/$route?companyId={$company->id}")
-                ->assertOk()->assertExactJson([
-                    'companyId' => $company->id, 'name' => 'Arca Pro', 'status' => 1,
-                    'currentContract' => $this->contractJson($active, 1),
-                ]);
-        }
+        $this->getJson("/api/v1/admin/companies/edit?companyId={$company->id}")
+            ->assertOk()->assertExactJson([
+                'companyId' => $company->id, 'name' => 'Arca Pro', 'status' => 1,
+                'currentContract' => $this->contractJson($active, 1),
+            ]);
         $active->delete();
-        $this->getJson("/api/v1/admin/companies/show?companyId={$company->id}")
+        $this->getJson("/api/v1/admin/companies/edit?companyId={$company->id}")
             ->assertOk()->assertJsonPath('currentContract.contractId', $old->id)
             ->assertJsonPath('currentContract.status', 0);
         $old->delete();
-        $this->getJson("/api/v1/admin/companies/show?companyId={$company->id}")
+        $this->getJson("/api/v1/admin/companies/edit?companyId={$company->id}")
             ->assertOk()->assertJsonPath('currentContract', null);
         $this->getJson('/api/v1/admin/companies?pageSize=101')->assertUnprocessable();
         $this->getJson('/api/v1/admin/companies?page=0')->assertUnprocessable();
-        $this->getJson('/api/v1/admin/companies/show?companyId=999')->assertNotFound();
+        $this->getJson('/api/v1/admin/companies/edit?companyId=999')->assertNotFound();
+    }
+
+    public function test_edit_is_the_only_company_details_route_and_requires_its_permission(): void
+    {
+        $company = $this->company();
+        $this->getJson("/api/v1/admin/companies/show?companyId={$company->id}")->assertNotFound();
+        $this->getJson('/api/v1/admin/companies/edit')->assertUnprocessable()->assertJsonValidationErrors(['companyId']);
+        $this->getJson('/api/v1/admin/companies/edit?companyId=invalid')->assertUnprocessable();
+
+        $this->admin->syncPermissions(['all_companies', 'update_company']);
+        $this->getJson("/api/v1/admin/companies/edit?companyId={$company->id}")->assertForbidden();
+        $this->admin->syncPermissions(['edit_company']);
+        $this->getJson("/api/v1/admin/companies/edit?companyId={$company->id}")
+            ->assertOk()->assertExactJson([
+                'companyId' => $company->id, 'name' => $company->name, 'status' => 1, 'currentContract' => null,
+            ]);
+        $this->putJson('/api/v1/admin/companies/update', [
+            'companyId' => $company->id, 'name' => 'Not permitted', 'status' => 1,
+        ])->assertForbidden();
+        $this->assertSame($company->name, $company->fresh()->name);
     }
 
     public function test_contract_create_conflicts_update_and_delete_keep_history_without_deletion_keys(): void
@@ -242,7 +260,7 @@ class CompanyContractsApiTest extends TestCase
         $this->contract($company, '2026-09-01', '2026-09-30');
         $previous = $this->contract($company, '2024-02-01', '2024-02-29');
         $this->contract($company, '2026-09-01', '2026-09-01')->delete();
-        $this->getJson("/api/v1/admin/companies/show?companyId={$company->id}")
+        $this->getJson("/api/v1/admin/companies/edit?companyId={$company->id}")
             ->assertOk()->assertJsonPath('currentContract.contractId', $previous->id);
         $created = $this->postJson('/api/v1/admin/company-contracts/renew', ['companyId' => $company->id])
             ->assertOk()->assertJsonPath('data.startDate', '2026-10-14')

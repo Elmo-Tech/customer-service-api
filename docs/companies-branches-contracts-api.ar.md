@@ -67,36 +67,9 @@ GET /companies?page=1&pageSize=10&filter[search]=Arca&filter[status]=1
 
 ## 2. تفاصيل الشركة
 
-### GET /companies/show
-
-**Request — Query Params:**
-
-مطلوب: `companyId`.
-
-```http
-GET /companies/show?companyId=4
-```
-
-**Response 200:**
-
-```json
-{
-  "companyId": 4,
-  "name": "Arca Pro",
-  "status": 1,
-  "currentContract": {
-    "contractId": 21,
-    "companyId": 4,
-    "startDate": "2026-10-12",
-    "endDate": "2026-11-10",
-    "status": 1
-  }
-}
-```
-
 ### GET /companies/edit
 
-راوت التفاصيل القديم يظل متاحًا للتوافق.
+هذا هو الراوت الوحيد لجلب تفاصيل الشركة وتجهيز شاشة التعديل، ويحتاج صلاحية `edit_company`. يرجع بيانات الشركة و`currentContract` دون بيانات الفروع أو العميل أو الحذف. قراءة البيانات لا تعدلها؛ الحفظ يتم من `PUT /companies/update` بصلاحية `update_company`.
 
 **Request — Query Params:**
 

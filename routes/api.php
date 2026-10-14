@@ -49,7 +49,6 @@ Route::prefix('v1/admin/companies')->group(function () {
     Route::get('', [CompanyController::class, 'allCompanies']);
     Route::post('create', [CompanyController::class, 'create']);
     Route::get('edit', [CompanyController::class, 'edit']);
-    Route::get('show', [CompanyController::class, 'edit']);
     Route::put('update', [CompanyController::class, 'update']);
     Route::delete('delete', [CompanyController::class, 'delete']);
 
